@@ -1,17 +1,31 @@
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
 pub type ShimsDB = HashMap<String, String>;
 
+// The Shims struct contains data required for handling shims.
 pub struct Shims<'a> {
-    pub path: &'a Path,
+    path: &'a Path,
+    tools_install_dir: &'a Path,
 }
 
 impl<'a> Shims<'a> {
-    pub fn new(path: &'a Path) -> Self {
-        Shims { path }
+    // Create a new Shims struct from the provided db path and installations
+    // directory.
+    pub fn new(db_path: &'a Path, tools_install_dir: &'a Path) -> Result<Self> {
+        if !tools_install_dir.is_dir() {
+            return Err(anyhow!(
+                "Supplied tools install dir ({:?}) is not an existing directory",
+                tools_install_dir
+            ));
+        };
+        Ok(Shims {
+            path: db_path,
+            tools_install_dir,
+        })
     }
 
     fn load_db(&self) -> Result<ShimsDB> {
@@ -20,6 +34,7 @@ impl<'a> Shims<'a> {
             .map_err(|err| anyhow!("Error deserializing ShimsDB: {}", err))
     }
 
+    // Save the provided shims db to a file.
     pub fn save_db(&self, db: &ShimsDB) -> Result<()> {
         let serialized = bincode::serialize(db)?;
         fs::write(self.path, &serialized)?;
@@ -31,20 +46,62 @@ impl<'a> Shims<'a> {
         let shims = self.load_db()?;
         Ok(shims.get(exe).map(|s| s.to_string()))
     }
+
+    pub fn generate_db_from_installed_tools(&self) -> Result<ShimsDB> {
+        let mut db: ShimsDB = HashMap::new();
+
+        for entry in fs::read_dir(self.tools_install_dir)? {
+            let entry = entry?;
+            let tool = entry.file_name().into_string().unwrap(); // Can we trust NTFS to always have unicode filenames?
+            for version in fs::read_dir(entry.path())? {
+                let version = version?;
+                if version.path().is_dir() {
+                    let mut path = version.path();
+                    path.push("bin");
+                    for exe in fs::read_dir(path)? {
+                        let exe = exe?;
+                        if valid_exe_extension(exe.path().extension()) {
+                            let exe_name = exe.file_name().into_string().unwrap();
+                            let old_value = db.insert(exe_name.clone(), tool.clone());
+                            if let Some(value) = old_value {
+                                if value != tool {
+                                    return Err(anyhow!(
+                                        "{} appears in two tools: {} and {}",
+                                        &exe_name,
+                                        &tool,
+                                        &value
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(db)
+    }
+}
+
+fn valid_exe_extension(extention: Option<&OsStr>) -> bool {
+    Some(OsStr::new("exe")) == extention
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_fs::{fixture::PathChild, TempDir};
+    use assert_fs::{
+        fixture::{FileTouch, PathChild, PathCreateDir},
+        TempDir,
+    };
 
     fn test_data() -> ShimsDB {
         HashMap::from([
-            ("kubectl".to_string(), "kubectl".to_string()),
-            ("docker".to_string(), "docker".to_string()),
-            ("minikube".to_string(), "minikube".to_string()),
-            ("kubectx".to_string(), "kubectx".to_string()),
-            ("kubens".to_string(), "kubectx".to_string()),
+            ("kubectl.exe".to_string(), "kubectl".to_string()),
+            ("docker.exe".to_string(), "docker".to_string()),
+            ("minikube.exe".to_string(), "minikube".to_string()),
+            ("kubectx.exe".to_string(), "kubectx".to_string()),
+            ("kubens.exe".to_string(), "kubectx".to_string()),
         ])
     }
 
@@ -53,7 +110,7 @@ mod tests {
         let db = test_data();
         let tmp_dir = TempDir::new().unwrap();
         let db_file = tmp_dir.child("shims.db");
-        let shims = Shims::new(db_file.path());
+        let shims = Shims::new(db_file.path(), tmp_dir.path()).unwrap();
         shims.save_db(&db).unwrap();
         let loaded = shims.load_db().unwrap();
         assert_eq!(db, loaded);
@@ -64,9 +121,9 @@ mod tests {
         let db = test_data();
         let tmp_dir = TempDir::new().unwrap();
         let db_file = tmp_dir.child("shims.db");
-        let shims = Shims::new(db_file.path());
+        let shims = Shims::new(db_file.path(), tmp_dir.path()).unwrap();
         shims.save_db(&db).unwrap();
-        let result = shims.find_plugin("kubens").unwrap();
+        let result = shims.find_plugin("kubens.exe").unwrap();
         assert_eq!(result, Some("kubectx".to_string()));
     }
 
@@ -75,9 +132,60 @@ mod tests {
         let db = test_data();
         let tmp_dir = TempDir::new().unwrap();
         let db_file = tmp_dir.child("shims.db");
-        let shims = Shims::new(db_file.path());
+        let shims = Shims::new(db_file.path(), tmp_dir.path()).unwrap();
         shims.save_db(&db).unwrap();
         let result = shims.find_plugin("mycmd").unwrap();
         assert_eq!(result, None);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn generate_shims_should_succeed() {
+        let tmp_dir = TempDir::new().unwrap();
+        let db_file = tmp_dir.child("shims.db");
+        let installs_dir = tmp_dir.child("installs");
+        installs_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
+        installs_dir.child("kubectl").child("1.2.4").child("bin").child("kubectl.exe").touch().unwrap();
+        installs_dir.child("kubectl").child("1.1").child("bin").create_dir_all().unwrap();
+        installs_dir.child("kubectl").child("1.1").child("bin").child("kubectl.exe").touch().unwrap();
+        installs_dir.child("docker").child("v1.17").child("bin").create_dir_all().unwrap();
+        installs_dir.child("docker").child("v1.17").child("bin").child("docker.exe").touch().unwrap();
+        installs_dir.child("docker").child("v1.19").child("bin").create_dir_all().unwrap();
+        installs_dir.child("docker").child("v1.19").child("bin").child("docker.exe").touch().unwrap();
+        installs_dir.child("minikube").child("2.5").child("bin").create_dir_all().unwrap();
+        installs_dir.child("minikube").child("2.5").child("bin").child("minikube.exe").touch().unwrap();
+        installs_dir.child("kubectx").child("0.12").child("bin").create_dir_all().unwrap();
+        installs_dir.child("kubectx").child("0.12").child("bin").child("kubectx.exe").touch().unwrap();
+        installs_dir.child("kubectx").child("0.12").child("bin").child("kubens.exe").touch().unwrap();
+
+        let shims = Shims::new(&db_file, &installs_dir).unwrap();
+        let db = test_data();
+        let generated = shims.generate_db_from_installed_tools().unwrap();
+        assert_eq!(db, generated);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn generate_shims_with_same_executable_name_in_two_tools_should_fail() {
+        let tmp_dir = TempDir::new().unwrap();
+        let db_file = tmp_dir.child("shims.db");
+        let installs_dir = tmp_dir.child("installs");
+        installs_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
+        // !! The executable created below should trigger an error:
+        installs_dir.child("kubectl").child("1.2.4").child("bin").child("kubens.exe").touch().unwrap();
+        installs_dir.child("kubectl").child("1.1").child("bin").create_dir_all().unwrap();
+        installs_dir.child("kubectl").child("1.1").child("bin").child("kubectl.exe").touch().unwrap();
+        installs_dir.child("kubectx").child("0.12").child("bin").create_dir_all().unwrap();
+        installs_dir.child("kubectx").child("0.12").child("bin").child("kubectx.exe").touch().unwrap();
+        installs_dir.child("kubectx").child("0.12").child("bin").child("kubens.exe").touch().unwrap();
+
+        let shims = Shims::new(&db_file, &installs_dir).unwrap();
+        let res = shims.generate_db_from_installed_tools();
+        if let Err(e) = res {
+            let err = format!("{:?}", e);
+            assert!(err.contains("kubens.exe"), "Wrong error was triggered ({:?}), should contain 'kubens.exe'", err);
+        } else {
+            assert!(false, "Same executable name in different tools should have triggered error");
+        }
     }
 }
