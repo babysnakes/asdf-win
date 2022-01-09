@@ -90,10 +90,7 @@ fn valid_exe_extension(extention: Option<&OsStr>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_fs::{
-        fixture::{FileTouch, PathChild, PathCreateDir},
-        TempDir,
-    };
+    use assert_fs::{prelude::*, TempDir};
 
     fn test_data() -> ShimsDB {
         HashMap::from([
