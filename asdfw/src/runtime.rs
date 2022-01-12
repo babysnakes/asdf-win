@@ -7,6 +7,7 @@ pub struct RuntimeEnvironment {
     pub home_dir: PathBuf,
     pub shims_db: PathBuf,
     pub installs_dir: PathBuf,
+    pub log_dir: PathBuf,
 }
 
 impl RuntimeEnvironment {
@@ -16,11 +17,13 @@ impl RuntimeEnvironment {
         let app_dir = home_dir.join(".asdfw");
         let shims_db = app_dir.join("shims.db");
         let installs_dir = app_dir.join("installs");
+        let log_dir = app_dir.join("logs");
         Ok(RuntimeEnvironment {
             home_dir,
             current_dir,
             shims_db,
             installs_dir,
+            log_dir,
         })
     }
 }
