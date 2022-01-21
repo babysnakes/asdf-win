@@ -1,14 +1,10 @@
 #![allow(dead_code)] // Fix: remove
 
-mod runtime;
-mod shims;
-mod tool_versions;
-
 use anyhow::Result;
 use clap::Parser;
 use flexi_logger::{Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming};
 use log::warn;
-use runtime::RuntimeEnvironment;
+use asdfw::runtime::RuntimeEnvironment;
 
 /// General Version Manager for Standalone Command Line Executables
 ///

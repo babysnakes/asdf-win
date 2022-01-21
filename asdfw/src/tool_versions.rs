@@ -106,9 +106,9 @@ mod tests {
     const FIXTURE_GLOBAL: &str = "tool1 v1.2\r\ntool2 v2.1.3\r\ntool3 v12\r\n";
     const FIXTURE_LOCAL: &str = "tool1 v1.3\r\ntool3 v10\r\n";
     const FIXTURE_LOCAL_SUBDIR: &str = "tool1 v1.4\r\n";
-    const FIXTURE_TOOL1_GLOBAL: (&str, &str) = ("tool1", "v1.2");
-    const FIXTURE_TOOL2_GLOBAL: (&str, &str) = ("tool2", "v2.1.3");
-    const FIXTURE_TOOL3_GLOBAL: (&str, &str) = ("tool3", "v12");
+    const _FIXTURE_TOOL1_GLOBAL: (&str, &str) = ("tool1", "v1.2");
+    const _FIXTURE_TOOL2_GLOBAL: (&str, &str) = ("tool2", "v2.1.3");
+    const _FIXTURE_TOOL3_GLOBAL: (&str, &str) = ("tool3", "v12");
     const FIXTURE_TOOL1_LOCAL: (&str, &str) = ("tool1", "v1.3");
     const FIXTURE_TOOL3_LOCAL: (&str, &str) = ("tool3", "v10");
     const FIXTURE_TOOL1_LOCAL_SUBDIR: (&str, &str) = ("tool1", "v1.4");
