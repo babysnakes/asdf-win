@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use log::info;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
@@ -38,6 +39,7 @@ impl<'a> Shims<'a> {
     pub fn save_db(&self, db: &ShimsDB) -> Result<()> {
         let serialized = bincode::serialize(db)?;
         fs::write(self.path, &serialized)?;
+        info!("Successfully saved db");
         Ok(())
     }
 
@@ -97,8 +99,8 @@ impl<'a> Shims<'a> {
     }
 }
 
-fn valid_exe_extension(extention: Option<&OsStr>) -> bool {
-    Some(OsStr::new("exe")) == extention
+fn valid_exe_extension(extension: Option<&OsStr>) -> bool {
+    Some(OsStr::new("exe")) == extension
 }
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 #![allow(dead_code)] // Fix: remove
 
 use anyhow::Result;
+use asdfw::runtime::RuntimeEnvironment;
+use asdfw::shims::Shims;
 use clap::Parser;
 use flexi_logger::{Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming};
-use log::warn;
-use asdfw::runtime::RuntimeEnvironment;
 
 /// General Version Manager for Standalone Command Line Executables
 ///
@@ -14,54 +14,44 @@ use asdfw::runtime::RuntimeEnvironment;
 struct Cli {
     /// Verbosity level. Specify more than once for more verbosity. By default
     /// only warning and errors are displayed.
-    #[structopt(short, parse(from_occurrences), global = true)]
+    #[clap(short, parse(from_occurrences), global = true)]
     verbose: usize,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     command: CliSubCommand,
 }
 
 #[derive(Debug, clap::Subcommand)]
 enum CliSubCommand {
-    /// Execute a command.
+    /// Recreate shims.
     ///
-    /// Execute the configured version of a command. All the args are passed
-    /// verbatim to the command. Make sure you prefix all args (after the
-    /// command name) with '--'.
-    /// Should not be called directly by the user.
-    Exec {
-        /// The command to execute
-        command: String,
-
-        /// all other arguments to pass to the command (add ' -- ' before the
-        /// args to avoid option parsing issues)
-        args: Vec<String>,
-    },
-    /// Just a dummy command
-    Dummy
+    /// Recreate the shims.db and the shims (currently not working)
+    Reshim,
 }
 
 fn main() -> Result<()> {
     let app = Cli::parse();
-    let env = RuntimeEnvironment::new()?;
     let log_level = match app.verbose {
-        0 => "warn",
-        1 => "info",
-        2 => "debug",
+        0 => "info",
+        1 => "debug",
         _ => "trace",
     };
+    log_to_stderr(&log_level)?;
 
-    match app.command {
-        CliSubCommand::Exec { .. } => log_to_file(&env, &log_level),
-        _ => log_to_stderr(&log_level),
-    }?;
-
-    warn!("{:?}", app);
-    Ok(())
+    run(app)
 }
 
-fn run(_: Cli) -> Result<()> {
-    Ok(())
+fn run(app: Cli) -> Result<()> {
+    let env = RuntimeEnvironment::new()?;
+    match app.command {
+        CliSubCommand::Reshim => reshim(&env),
+    }
+}
+
+fn reshim(env: &RuntimeEnvironment) -> Result<()> {
+    let shims = Shims::new(&env.shims_db, &env.installs_dir)?;
+    let db = shims.generate_db_from_installed_tools()?;
+    shims.save_db(&db)
 }
 
 fn log_to_file(env: &RuntimeEnvironment, spec: &str) -> Result<LoggerHandle> {
