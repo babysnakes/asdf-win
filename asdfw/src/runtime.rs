@@ -8,6 +8,7 @@ pub struct RuntimeEnvironment {
     pub shims_db: PathBuf,
     pub installs_dir: PathBuf,
     pub log_dir: PathBuf,
+    pub global_tool_versions_file: PathBuf,
 }
 
 impl RuntimeEnvironment {
@@ -18,12 +19,14 @@ impl RuntimeEnvironment {
         let shims_db = app_dir.join("shims.db");
         let installs_dir = app_dir.join("installs");
         let log_dir = app_dir.join("logs");
+        let global_tool_versions_file = home_dir.join(".tool-versions");
         Ok(RuntimeEnvironment {
             home_dir,
             current_dir,
             shims_db,
             installs_dir,
             log_dir,
+            global_tool_versions_file,
         })
     }
 }

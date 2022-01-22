@@ -38,6 +38,7 @@ dependencies = [
  "flexi_logger",
  "log",
  "rstest",
+ "winapi",
 ]
 
 [[package]]

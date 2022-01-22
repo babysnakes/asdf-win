@@ -2,19 +2,19 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub type ShimsDB = HashMap<String, String>;
 
-// The Shims struct contains data required for handling shims.
+/// The Shims struct contains data required for handling shims.
 pub struct Shims<'a> {
     path: &'a Path,
     tools_install_dir: &'a Path,
 }
 
 impl<'a> Shims<'a> {
-    // Create a new Shims struct from the provided db path and installations
-    // directory.
+    /// Create a new Shims struct from the provided db path and installations
+    /// directory.
     pub fn new(db_path: &'a Path, tools_install_dir: &'a Path) -> Result<Self> {
         if !tools_install_dir.is_dir() {
             return Err(anyhow!(
@@ -34,14 +34,28 @@ impl<'a> Shims<'a> {
             .map_err(|err| anyhow!("Error deserializing ShimsDB: {}", err))
     }
 
-    // Save the provided shims db to a file.
+    /// Save the provided shims db to a file.
     pub fn save_db(&self, db: &ShimsDB) -> Result<()> {
         let serialized = bincode::serialize(db)?;
         fs::write(self.path, &serialized)?;
         Ok(())
     }
 
-    // Find a plugin which owns this exe
+    /// Returns the full path to the shimmed executable.
+    pub fn get_full_executable_path(
+        &self,
+        exe: &str,
+        tool: &str,
+        version: &str,
+    ) -> Result<PathBuf> {
+        let root = self
+            .tools_install_dir
+            .to_str()
+            .ok_or(anyhow!("Couldn't parse install dir as string."))?;
+        Ok([&root, tool, version, "bin", exe].iter().collect())
+    }
+
+    /// Find a plugin which owns this exe
     pub fn find_plugin(&self, exe: &str) -> Result<Option<String>> {
         let shims = self.load_db()?;
         Ok(shims.get(exe).map(|s| s.to_string()))
@@ -91,6 +105,7 @@ fn valid_exe_extension(extention: Option<&OsStr>) -> bool {
 mod tests {
     use super::*;
     use assert_fs::{prelude::*, TempDir};
+    use std::str::FromStr;
 
     fn test_data() -> ShimsDB {
         HashMap::from([
@@ -184,5 +199,24 @@ mod tests {
         } else {
             assert!(false, "Same executable name in different tools should have triggered error");
         }
+    }
+
+    #[test]
+    fn test_get_full_executable_path() {
+        let tmp_dir = TempDir::new().unwrap();
+        let db_file = tmp_dir.child("shims.db");
+        let shims = Shims::new(db_file.path(), tmp_dir.path()).unwrap();
+        let tool = "mytool";
+        let exe = "myexe";
+        let version = "v1.0.1";
+        let path = format!(
+            "{}/{}/{}/bin/{}",
+            tmp_dir.to_str().unwrap(),
+            tool,
+            version,
+            exe
+        );
+        let result = shims.get_full_executable_path(exe, tool, version);
+        assert_eq!(result.unwrap(), PathBuf::from_str(&path).unwrap());
     }
 }
