@@ -6,7 +6,7 @@ use asdfw::tool_versions::ToolVersions;
 use flexi_logger::*;
 use std::{env, process};
 
-const ERROR_PREFIX: &str = "ASDFW ERROR:";
+const ERROR_PREFIX: &str = "ASDFW ERROR";
 const DEBUG_VARIABLE: &str = "ASDFW_DEBUG_SHIM";
 
 fn main() -> Result<()> {

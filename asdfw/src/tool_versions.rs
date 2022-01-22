@@ -2,7 +2,8 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
+use log::debug;
 
 const FILE_NAME: &str = ".tool-versions";
 
@@ -60,7 +61,9 @@ impl<'a> ToolVersions<'a> {
     }
 
     fn get_version_from_global(&self) -> Result<Option<String>> {
+        debug!("Searching for version in global file: {}", &self.tool);
         search_tool_in_file(self.tool, self.global_path)
+            .context("Parsing global tool versions file")
     }
 }
 
@@ -138,7 +141,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case("my-tool ", "missing versione")]
+    #[case("my-tool ", "missing version")]
     #[case("my-tool v1 1.2", "more then one space")]
     #[case("my-tool  v11.2", "two spaces separator")]
     fn parse_invalid_line(#[case] line: &str, #[case] msg: &str) {
