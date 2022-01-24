@@ -49,12 +49,13 @@ impl<'a> Shims<'a> {
         exe: &str,
         tool: &str,
         version: &str,
-    ) -> Result<PathBuf> {
+    ) -> Result<Option<PathBuf>> {
         let root = self
             .tools_install_dir
             .to_str()
             .ok_or(anyhow!("Couldn't parse install dir as string."))?;
-        Ok([&root, tool, version, "bin", exe].iter().collect())
+        let path: PathBuf = [&root, tool, version, "bin", exe].iter().collect();
+        Ok(if path.exists() { Some(path) } else { None })
     }
 
     /// Find a plugin which owns this exe
@@ -204,21 +205,33 @@ mod tests {
     }
 
     #[test]
-    fn test_get_full_executable_path() {
+    fn test_get_full_executable_path_when_version_does_not_exist_returns_none() {
         let tmp_dir = TempDir::new().unwrap();
         let db_file = tmp_dir.child("shims.db");
         let shims = Shims::new(db_file.path(), tmp_dir.path()).unwrap();
         let tool = "mytool";
         let exe = "myexe";
         let version = "v1.0.1";
-        let path = format!(
-            "{}/{}/{}/bin/{}",
-            tmp_dir.to_str().unwrap(),
-            tool,
-            version,
-            exe
-        );
         let result = shims.get_full_executable_path(exe, tool, version);
-        assert_eq!(result.unwrap(), PathBuf::from_str(&path).unwrap());
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_full_executable_path_when_version_exists_returns_path() {
+        let tmp_dir = TempDir::new().unwrap();
+        let db_file = tmp_dir.child("shims.db");
+        let shims = Shims::new(db_file.path(), tmp_dir.path()).unwrap();
+        let tool = "mytool";
+        let exe = "myexe";
+        let version = "v1.0.1";
+        let binary = tmp_dir
+            .child(&tool)
+            .child(&version)
+            .child("bin")
+            .child(&exe);
+        binary.touch().unwrap();
+        let path = binary.to_str().unwrap();
+        let result = shims.get_full_executable_path(exe, tool, version);
+        assert_eq!(result.unwrap(), Some(PathBuf::from_str(path).unwrap()));
     }
 }

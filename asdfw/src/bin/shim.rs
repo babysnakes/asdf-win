@@ -35,10 +35,14 @@ fn run() -> Result<i32> {
         &tool,
     );
     match tool_versions.get_version()? {
-        Some(version) => {
-            let cmd = shims.get_full_executable_path(&exe_name, &tool, &version)?;
-            exec(&cmd, args)
-        }
+        Some(version) => match shims.get_full_executable_path(&exe_name, &tool, &version)? {
+            Some(cmd) => exec(&cmd, args),
+            None => Err(anyhow!(
+                "Version '{}' of '{}' does not seems to be installed",
+                &version,
+                &tool
+            )),
+        },
         None => Err(anyhow!(
             "You don't have a version configured for '{}' ({})",
             &exe_name,
