@@ -28,7 +28,7 @@ fn run() -> Result<i32> {
     let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir)?;
     let tool = shims
         .find_plugin(&exe_name)?
-        .ok_or(anyhow!("No plugin by the name: {}", &exe_name))?;
+        .ok_or(anyhow!("No tool configured for the command: {}", &exe_name))?;
     let tool_versions = ToolVersions::new(
         &runtime.global_tool_versions_file,
         &runtime.current_dir,
