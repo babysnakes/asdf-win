@@ -80,7 +80,3 @@ fn log_to_file(env: &RuntimeEnvironment, spec: &str) -> Result<LoggerHandle> {
         .append()
         .start()?)
 }
-
-fn log_to_stderr(spec: &str) -> Result<LoggerHandle> {
-    Ok(Logger::try_with_str(spec)?.log_to_stderr().start()?)
-}

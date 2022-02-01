@@ -63,8 +63,8 @@ mod tests {
         let expected = [
             " \u{1b}[31m\u{1b}[0m  This is an error description that should span",
             "    over several lines",
-            " Caused by:",
             "",
+            " Caused by:",
             "   \u{1b}[31m-\u{1b}[0m  The first cause",
             "   \u{1b}[31m-\u{1b}[0m  The most nested cause. Should also span over",
             "      multiple lines hopefully.",
