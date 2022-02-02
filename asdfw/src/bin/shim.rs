@@ -25,7 +25,12 @@ fn run() -> Result<i32> {
     if let Ok(_) = env::var(DEBUG_VARIABLE) {
         configure_log(&runtime)?;
     };
-    let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir)?;
+    let shims = Shims::new(
+        &runtime.shims_db,
+        &runtime.installs_dir,
+        &runtime.shims_dir,
+        &runtime.shim_exe,
+    )?;
     let tool = shims
         .find_plugin(&exe_name)?
         .ok_or(anyhow!("No tool configured for the command: {}", &exe_name))?;

@@ -1,11 +1,10 @@
-#![allow(dead_code)] // Fix: remove
-
 use anyhow::Result;
 use asdfw::output::*;
 use asdfw::runtime::RuntimeEnvironment;
 use asdfw::shims::Shims;
 use clap::Parser;
 use flexi_logger::{Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming};
+use log::info;
 
 /// General Version Manager for Standalone Command Line Executables
 ///
@@ -27,7 +26,12 @@ enum CliSubCommand {
     /// Recreate shims.
     ///
     /// Recreate the shims.db and the shims (currently not working)
-    Reshim,
+    Reshim {
+        /// Cleanup all existing shims before creating them. This will remove
+        /// dangling shims.
+        #[clap(long)]
+        cleanup: bool,
+    },
 }
 
 fn main() {
@@ -57,14 +61,21 @@ fn do_main(app: Cli) -> Result<()> {
 
 fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
     match app.command {
-        CliSubCommand::Reshim => reshim(&env),
+        CliSubCommand::Reshim { cleanup } => reshim(&env, cleanup),
     }
 }
 
-fn reshim(env: &RuntimeEnvironment) -> Result<()> {
-    let shims = Shims::new(&env.shims_db, &env.installs_dir)?;
+fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
+    info!("Create shims requested");
+    let shims = Shims::new(
+        &env.shims_db,
+        &env.installs_dir,
+        &env.shims_dir,
+        &env.shim_exe,
+    )?;
     let db = shims.generate_db_from_installed_tools()?;
     shims.save_db(&db)?;
+    shims.create_shims(cleanup)?;
     let output = success_message("Reshim finished successfully.");
     Ok(print_out(output))
 }
