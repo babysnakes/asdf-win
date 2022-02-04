@@ -1,7 +1,7 @@
 use anyhow::Result;
-use asdfw::output::*;
 use asdfw::runtime::RuntimeEnvironment;
 use asdfw::shims::Shims;
+use asdfw::{output::*, tool_versions::ToolVersions};
 use clap::Parser;
 use flexi_logger::{Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming};
 use log::info;
@@ -31,6 +31,20 @@ enum CliSubCommand {
         /// dangling shims.
         #[clap(long)]
         cleanup: bool,
+    },
+    /// Configure tool's version in current directory.
+    Local {
+        /// The tool to configure the version for
+        tool: String,
+        /// The version to use locally for the specified tool
+        version: String,
+    },
+    /// Configure tool's version globally.
+    Global {
+        /// The tool to configure the version for
+        tool: String,
+        /// The version to use globally for the specified tool
+        version: String,
     },
 }
 
@@ -62,6 +76,8 @@ fn do_main(app: Cli) -> Result<()> {
 fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
     match app.command {
         CliSubCommand::Reshim { cleanup } => reshim(&env, cleanup),
+        CliSubCommand::Local { tool, version } => set_local(env, &tool, &version),
+        CliSubCommand::Global { tool, version } => set_global(env, &tool, &version),
     }
 }
 
@@ -77,6 +93,28 @@ fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
     shims.save_db(&db)?;
     shims.create_shims(cleanup)?;
     let output = success_message("Reshim finished successfully.");
+    Ok(print_out(output))
+}
+
+fn set_global<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
+    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
+    tvs.save_global(&version)?;
+    let msg = format!(
+        "Successfully configured global version ({}) for {}",
+        &version, &tool
+    );
+    let output = success_message(&msg);
+    Ok(print_out(output))
+}
+
+fn set_local<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
+    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
+    tvs.save_local(&version)?;
+    let msg = format!(
+        "Successfully configured local version ({}) for {}",
+        &version, &tool
+    );
+    let output = success_message(&msg);
     Ok(print_out(output))
 }
 
