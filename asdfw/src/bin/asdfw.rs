@@ -2,15 +2,18 @@ use anyhow::Result;
 use asdfw::runtime::RuntimeEnvironment;
 use asdfw::shims::Shims;
 use asdfw::{output::*, tool_versions::ToolVersions};
-use clap::Parser;
+use clap::{IntoApp, Parser};
+use clap_complete::{generate, shells::PowerShell};
 use flexi_logger::{Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming};
 use log::info;
+
+const APP_NAME: &str = "asdfw";
 
 /// General Version Manager for Standalone Command Line Executables
 ///
 /// A (some kind of) clone of `asdf` for windows.
 #[derive(Debug, Parser)]
-#[clap(name = "asdfw.exe", version)]
+#[clap(name = APP_NAME, version)]
 struct Cli {
     /// Verbosity level. Specify more than once for more verbosity. By default
     /// only warning and errors are displayed.
@@ -46,6 +49,13 @@ enum CliSubCommand {
         /// The version to use globally for the specified tool
         version: String,
     },
+    /// Generate completion.
+    ///
+    /// The output of this command could be redirected to a file to be loaded at
+    /// shell initialization for invoked directly:
+    ///
+    ///     asdfw.exe completions | Out-String | Invoke-Expression
+    Completion,
 }
 
 fn main() {
@@ -78,6 +88,7 @@ fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
         CliSubCommand::Reshim { cleanup } => reshim(&env, cleanup),
         CliSubCommand::Local { tool, version } => set_local(env, &tool, &version),
         CliSubCommand::Global { tool, version } => set_global(env, &tool, &version),
+        CliSubCommand::Completion => gen_completions(),
     }
 }
 
@@ -105,6 +116,12 @@ fn set_global<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> 
     );
     let output = success_message(&msg);
     Ok(print_out(output))
+}
+
+fn gen_completions<'a>() -> Result<()> {
+    let mut app = Cli::into_app();
+    generate(PowerShell, &mut app, APP_NAME, &mut std::io::stdout());
+    Ok(())
 }
 
 fn set_local<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
