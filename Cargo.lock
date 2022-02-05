@@ -108,7 +108,8 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "clap"
 version = "3.0.14"
-source = "git+https://github.com/babysnakes/clap?branch=powershell-fix#a42b4b7d279e1efbf9f55f19c72c7ba1f194c6cd"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b63edc3f163b3c71ec8aa23f9bd6070f77edbf3d1d198b164afa90ff00e4ec62"
 dependencies = [
  "atty",
  "bitflags",
@@ -124,8 +125,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "3.0.5"
-source = "git+https://github.com/babysnakes/clap?branch=powershell-fix#a42b4b7d279e1efbf9f55f19c72c7ba1f194c6cd"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "678db4c39c013cc68b54d372bce2efc58e30a0337c497c9032fd196802df3bc3"
 dependencies = [
  "clap",
 ]
@@ -133,7 +135,8 @@ dependencies = [
 [[package]]
 name = "clap_derive"
 version = "3.0.14"
-source = "git+https://github.com/babysnakes/clap?branch=powershell-fix#a42b4b7d279e1efbf9f55f19c72c7ba1f194c6cd"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a1132dc3944b31c20dd8b906b3a9f0a5d0243e092d59171414969657ac6aa85"
 dependencies = [
  "heck",
  "proc-macro-error",

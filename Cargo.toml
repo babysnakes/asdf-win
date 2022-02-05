@@ -1,7 +1,2 @@
 [workspace]
 members = [ "asdfw" ]
-
-# TODO: Remove once fixed in clap upstream
-[patch.crates-io]
-clap = { git = "https://github.com/babysnakes/clap", branch = "powershell-fix" }
-clap_complete = { git = "https://github.com/babysnakes/clap", branch = "powershell-fix" }
