@@ -5,6 +5,8 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const EXTENSIONS: &'static [&str] = &["exe"];
+
 pub type ShimsDB = HashMap<String, String>;
 
 /// The Shims struct contains data required for handling shims.
@@ -67,6 +69,27 @@ impl<'a> Shims<'a> {
         Ok(if path.exists() { Some(path) } else { None })
     }
 
+    /// Resolve executable name as shim even if entered without extension.
+    pub fn resolve_command(&self, exe: &str) -> Result<Option<String>> {
+        for entry in fs::read_dir(&self.shims_dir)? {
+            let name = entry?
+                .file_name()
+                .into_string()
+                .map_err(|e| anyhow!("could not convert {:?} to string", e))?;
+            if exe == &name {
+                return Ok(Some(name));
+            }
+            for ext in EXTENSIONS.iter() {
+                let with_ext = format!("{}.{}", exe, ext);
+                if with_ext == name {
+                    return Ok(Some(name));
+                }
+            }
+        }
+        // Fix: test!
+        Ok(None)
+    }
+
     /// Find a plugin which owns this exe
     pub fn find_plugin(&self, exe: &str) -> Result<Option<String>> {
         let shims = self.load_db()?;
@@ -126,13 +149,19 @@ impl<'a> Shims<'a> {
 }
 
 fn valid_exe_extension(extension: Option<&OsStr>) -> bool {
-    Some(OsStr::new("exe")) == extension
+    for item in EXTENSIONS.iter() {
+        if Some(OsStr::new(item)) == extension {
+            return true;
+        }
+    }
+    return false;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_fs::{fixture::ChildPath, prelude::*, TempDir};
+    use rstest::rstest;
     use std::{fs::OpenOptions, str::FromStr};
 
     struct TestPaths {
@@ -178,6 +207,28 @@ mod tests {
         shims.save_db(&db).unwrap();
         let loaded = shims.load_db().unwrap();
         assert_eq!(db, loaded);
+    }
+
+    #[rustfmt::skip]
+    #[rstest]
+    #[case(vec!["hello.exe", "world.exe"], "hello.exe", Some("hello.exe".to_string()), "exact match")]
+    #[case(vec!["hello.exe", "world.exe"], "hello", Some("hello.exe".to_string()), "missing extension")]
+    #[case(vec!["hello.exe", "world.exe"], "what.exe", None, "invalid command")]
+    fn resolve_command_tests(
+        #[case] existing_shims: Vec<&str>,
+        #[case] exe: &str,
+        #[case] expected: Option<String>,
+        #[case] msg: &str,
+    ) {
+        let tmp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&tmp_dir);
+        #[rustfmt::skip]
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe).unwrap();
+        for n in existing_shims {
+            paths.shims_dir.child(&n).touch().unwrap();
+        }
+        let result = shims.resolve_command(&exe).unwrap();
+        assert_eq!(result, expected, "test case: {}", &msg);
     }
 
     #[test]
@@ -227,6 +278,21 @@ mod tests {
         let db = test_data();
         let generated = shims.generate_db_from_installed_tools().unwrap();
         assert_eq!(db, generated);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn generate_shims_should_not_include_files_without_valid_extension() {
+        let tmp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&tmp_dir);
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe).unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").child("kubectl.exe").touch().unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.1").child("bin").create_dir_all().unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.1").child("bin").child("kubectl.exe").touch().unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.1").child("bin").child("kubectl.txt").touch().unwrap();
+        let generated = shims.generate_db_from_installed_tools().unwrap();
+        assert!(!generated.contains_key("kubectl.txt"), "should not contain files with wrong extension");
     }
 
     #[test]

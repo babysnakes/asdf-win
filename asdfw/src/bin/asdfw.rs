@@ -1,4 +1,5 @@
 use anyhow::Result;
+use asdfw::common::*;
 use asdfw::runtime::RuntimeEnvironment;
 use asdfw::shims::Shims;
 use asdfw::{output::*, tool_versions::ToolVersions};
@@ -56,6 +57,11 @@ enum CliSubCommand {
     ///
     ///     asdfw.exe completions | Out-String | Invoke-Expression
     Completion,
+    /// Get full path to configured version for command
+    Which {
+        /// The command to get the full path for (could omit extension)
+        cmd: String,
+    },
 }
 
 fn main() {
@@ -89,6 +95,7 @@ fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
         CliSubCommand::Local { tool, version } => set_local(env, &tool, &version),
         CliSubCommand::Global { tool, version } => set_global(env, &tool, &version),
         CliSubCommand::Completion => gen_completions(),
+        CliSubCommand::Which { cmd } => which(&env, &cmd),
     }
 }
 
@@ -133,6 +140,12 @@ fn set_local<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> R
     );
     let output = success_message(&msg);
     Ok(print_out(output))
+}
+
+fn which(env: &RuntimeEnvironment, cmd: &str) -> Result<()> {
+    info!("invoked `which` on {}", &cmd);
+    let path = find_path_for_cmd(env, cmd)?;
+    Ok(print_out(vec![path]))
 }
 
 fn log_to_file(env: &RuntimeEnvironment, spec: &str) -> Result<LoggerHandle> {
