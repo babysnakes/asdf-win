@@ -34,11 +34,7 @@ fn which_with_no_version_configured_should_return_error_no_version() {
     common::test_data_matching_shims(&paths.shims_dir, &db);
     let err = find_path_for_cmd(&env, "cmd3.exe").unwrap_err();
     let msg = format!("{}", err);
-    assert!(
-        msg.contains("No version"),
-        "wrong error message for no configured version: {}",
-        &msg
-    );
+    assert!(msg.contains("No version"), "wrong error message for no configured version: {}", &msg);
 }
 
 #[rstest]
@@ -61,11 +57,7 @@ fn which_should_return_valid_executable_path(
     common::fixture_installed_tools(&paths.installs_dir);
     let db = paths.generate_shims_db();
     common::test_data_matching_shims(&paths.shims_dir, &db);
-    let expected = mytool_dir
-        .child(&create_exe)
-        .path()
-        .to_string_lossy()
-        .into_owned();
+    let expected = mytool_dir.child(&create_exe).path().to_string_lossy().into_owned();
     let result = find_path_for_cmd(&env, &search_exe).unwrap();
     assert_eq!(expected, result, "wrong path from `which`. case: {}", msg);
 }

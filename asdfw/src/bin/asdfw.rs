@@ -101,12 +101,7 @@ fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
 
 fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
     info!("Create shims requested");
-    let shims = Shims::new(
-        &env.shims_db,
-        &env.installs_dir,
-        &env.shims_dir,
-        &env.shim_exe,
-    )?;
+    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe)?;
     let db = shims.generate_db_from_installed_tools()?;
     shims.save_db(&db)?;
     shims.create_shims(cleanup)?;
@@ -117,10 +112,7 @@ fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
 fn set_global<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
     let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
     tvs.save_global(&version)?;
-    let msg = format!(
-        "Successfully configured global version ({}) for {}",
-        &version, &tool
-    );
+    let msg = format!("Successfully configured global version ({}) for {}", &version, &tool);
     let output = success_message(&msg);
     Ok(print_out(output))
 }
@@ -134,10 +126,7 @@ fn gen_completions<'a>() -> Result<()> {
 fn set_local<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
     let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
     tvs.save_local(&version)?;
-    let msg = format!(
-        "Successfully configured local version ({}) for {}",
-        &version, &tool
-    );
+    let msg = format!("Successfully configured local version ({}) for {}", &version, &tool);
     let output = success_message(&msg);
     Ok(print_out(output))
 }
@@ -151,11 +140,7 @@ fn which(env: &RuntimeEnvironment, cmd: &str) -> Result<()> {
 fn log_to_file(env: &RuntimeEnvironment, spec: &str) -> Result<LoggerHandle> {
     Ok(Logger::try_with_str(spec)?
         .log_to_file(FileSpec::default().directory(&env.log_dir))
-        .rotate(
-            Criterion::Size(1_000_000),
-            Naming::Numbers,
-            Cleanup::KeepLogFiles(4),
-        )
+        .rotate(Criterion::Size(1_000_000), Naming::Numbers, Cleanup::KeepLogFiles(4))
         .append()
         .start()?)
 }

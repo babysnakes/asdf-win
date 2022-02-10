@@ -17,18 +17,11 @@ pub fn output_full_error(err: Error, width: Option<usize>) -> Vec<String> {
     };
     let main_prefix = format!(" {}  ", Paint::red(""));
     let causes_prefix = format!("   {}  ", Paint::red("-"));
-    let main_options = Options::new(width)
-        .initial_indent(&main_prefix)
-        .subsequent_indent("    ");
-    let causes_options = Options::new(width)
-        .initial_indent(&causes_prefix)
-        .subsequent_indent("      ");
+    let main_options = Options::new(width).initial_indent(&main_prefix).subsequent_indent("    ");
+    let causes_options = Options::new(width).initial_indent(&causes_prefix).subsequent_indent("      ");
     let main_msg = format!("{}", err);
 
-    let mut output: Vec<String> = wrap(&main_msg, main_options)
-        .iter()
-        .map(|s| s.clone().into_owned())
-        .collect();
+    let mut output: Vec<String> = wrap(&main_msg, main_options).iter().map(|s| s.clone().into_owned()).collect();
 
     let causes = err.chain().skip(1);
     if causes.len() > 0 {
@@ -69,9 +62,7 @@ mod tests {
             "   \u{1b}[31m-\u{1b}[0m  The most nested cause. Should also span over",
             "      multiple lines hopefully.",
         ];
-        let err1: Result<()> = Err(anyhow!(
-            "The most nested cause. Should also span over multiple lines hopefully."
-        ));
+        let err1: Result<()> = Err(anyhow!("The most nested cause. Should also span over multiple lines hopefully."));
         let err2 = err1.context("The first cause").unwrap_err();
         let err3 = err2.context("This is an error description that should span over several lines");
         let result = output_full_error(err3, Some(50));

@@ -62,13 +62,7 @@ impl Paths {
     }
 
     pub fn generate_shims_db(&self) -> ShimsDB {
-        let shims = Shims::new(
-            &self.shims_db,
-            &self.installs_dir,
-            &self.shims_dir,
-            &self.shim_exe,
-        )
-        .unwrap();
+        let shims = Shims::new(&self.shims_db, &self.installs_dir, &self.shims_dir, &self.shim_exe).unwrap();
         let db = shims.generate_db_from_installed_tools().unwrap();
         shims.save_db(&db).unwrap();
         db

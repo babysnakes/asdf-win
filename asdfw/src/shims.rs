@@ -42,8 +42,7 @@ impl<'a> Shims<'a> {
 
     fn load_db(&self) -> Result<ShimsDB> {
         let contents = fs::read(self.path)?;
-        bincode::deserialize(&contents)
-            .map_err(|err| anyhow!("Error deserializing ShimsDB: {}", err))
+        bincode::deserialize(&contents).map_err(|err| anyhow!("Error deserializing ShimsDB: {}", err))
     }
 
     /// Save the provided shims db to a file.
@@ -55,12 +54,7 @@ impl<'a> Shims<'a> {
     }
 
     /// Returns the full path to the shimmed executable.
-    pub fn get_full_executable_path(
-        &self,
-        exe: &str,
-        tool: &str,
-        version: &str,
-    ) -> Result<Option<PathBuf>> {
+    pub fn get_full_executable_path(&self, exe: &str, tool: &str, version: &str) -> Result<Option<PathBuf>> {
         let root = self
             .tools_install_dir
             .to_str()

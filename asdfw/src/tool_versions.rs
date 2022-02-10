@@ -44,10 +44,7 @@ impl<'a> ToolVersions<'a> {
     }
 
     pub fn save_local(&self, version: &'a str) -> Result<()> {
-        info!(
-            "Setting local ({:?}) version for '{}': {}",
-            self.current_dir, self.tool, &version
-        );
+        info!("Setting local ({:?}) version for '{}': {}", self.current_dir, self.tool, &version);
         let context = format!("setting local version for {}: {}", self.tool, version);
         let local_file = self.current_dir.join(FILE_NAME);
         set_tool_version(&local_file, self.tool, version).context(context)
@@ -82,8 +79,7 @@ impl<'a> ToolVersions<'a> {
 
     fn get_version_from_global(&self) -> Result<Option<String>> {
         debug!("Searching for version in global file: {}", &self.tool);
-        search_tool_in_file(self.tool, self.global_path)
-            .context("Parsing global tool versions file")
+        search_tool_in_file(self.tool, self.global_path).context("Parsing global tool versions file")
     }
 }
 
@@ -101,19 +97,13 @@ fn set_tool_version<'a>(path: &'a Path, tool: &'a str, version: &'a str) -> Resu
 
 fn load_file<'a>(path: &'a Path) -> Result<ToolVersionsData> {
     if !path.exists() {
-        info!(
-            "Tool versions file '{:?}' does not exist. Returning empty versions.",
-            &path
-        );
+        info!("Tool versions file '{:?}' does not exist. Returning empty versions.", &path);
         return Ok(HashMap::new());
     }
     let mut data = HashMap::new();
     let context = format!("reading tool versions from {:?}", &path);
     let file = File::open(path).context(context.clone())?;
-    let lines = io::BufReader::new(file)
-        .lines()
-        .collect::<Result<Vec<_>, _>>()
-        .context(context)?;
+    let lines = io::BufReader::new(file).lines().collect::<Result<Vec<_>, _>>().context(context)?;
     for line in lines {
         let (tool, version) = parse_line(&line).map(|(k, v)| (k.to_owned(), v.to_owned()))?;
         data.insert(tool, version);
@@ -123,10 +113,7 @@ fn load_file<'a>(path: &'a Path) -> Result<ToolVersionsData> {
 
 fn save_file<'a>(data: ToolVersionsData, path: &'a Path) -> Result<()> {
     let pairs = Vec::from_iter(data.iter());
-    let mut strings = pairs
-        .iter()
-        .map(|(k, v)| format!("{} {}", k, v))
-        .collect::<Vec<String>>();
+    let mut strings = pairs.iter().map(|(k, v)| format!("{} {}", k, v)).collect::<Vec<String>>();
     strings.push("".to_owned());
     let content = strings.join("\r\n");
     fs::write(&path, content).context(format!("Saving tool versions to: {:?}", &path))
@@ -186,15 +173,9 @@ mod tests {
         let global_file = assert_fs::NamedTempFile::new(FILE_NAME).unwrap();
         global_file.write_str(FIXTURE_GLOBAL).unwrap();
         let current_dir = assert_fs::TempDir::new().unwrap();
-        current_dir
-            .child(FILE_NAME)
-            .write_str(FIXTURE_LOCAL)
-            .unwrap();
+        current_dir.child(FILE_NAME).write_str(FIXTURE_LOCAL).unwrap();
         let subdir = current_dir.child(SUBDIR);
-        subdir
-            .child(FILE_NAME)
-            .write_str(FIXTURE_LOCAL_SUBDIR)
-            .unwrap();
+        subdir.child(FILE_NAME).write_str(FIXTURE_LOCAL_SUBDIR).unwrap();
         (global_file, current_dir)
     }
 
@@ -217,11 +198,7 @@ mod tests {
 
     #[rstest]
     #[case("tool1 v1.2\r\ntool2 v2.1.3\r\ntool3 5.6\r\n", "tool3", "5.6")]
-    fn find_version_in_file_existing_tool(
-        #[case] content: &str,
-        #[case] tool: &str,
-        #[case] ver: String,
-    ) {
+    fn find_version_in_file_existing_tool(#[case] content: &str, #[case] tool: &str, #[case] ver: String) {
         let temp_file = assert_fs::NamedTempFile::new(".tool_versions").unwrap();
         temp_file.write_str(content).unwrap();
         let res = search_tool_in_file(tool, temp_file.path()).unwrap();
@@ -239,10 +216,7 @@ mod tests {
 
     #[rstest]
     #[case("tool1 v1.2\r\ntool2 v2.1.3\r\ntool3  5.6\r\n", "tool3")]
-    fn find_version_in_file_corrupt_file_if_reaches_corrupt_line(
-        #[case] content: &str,
-        #[case] tool: &str,
-    ) {
+    fn find_version_in_file_corrupt_file_if_reaches_corrupt_line(#[case] content: &str, #[case] tool: &str) {
         let temp_file = assert_fs::NamedTempFile::new(".tool_versions").unwrap();
         temp_file.write_str(content).unwrap();
         let res = search_tool_in_file(tool, temp_file.path());
@@ -299,11 +273,7 @@ mod tests {
         let tvs = ToolVersions::new(&global_file, &current_dir, &tool);
         tvs.save_global(&version).unwrap();
         let res = tvs.get_version().unwrap();
-        assert_eq!(
-            res,
-            Some(version.to_string()),
-            "saved and loaded version should match"
-        );
+        assert_eq!(res, Some(version.to_string()), "saved and loaded version should match");
     }
 
     #[rstest]
@@ -322,12 +292,7 @@ mod tests {
         tvs.save_global(version).unwrap();
         let res = tvs.get_version().unwrap();
 
-        assert_eq!(
-            res,
-            Some(version.to_string()),
-            "{}: loaded does not match saved",
-            msg
-        );
+        assert_eq!(res, Some(version.to_string()), "{}: loaded does not match saved", msg);
     }
 
     #[test]
@@ -339,30 +304,18 @@ mod tests {
         let tvs = ToolVersions::new(&global_file, &current_dir, &tool);
         tvs.save_local(&version).unwrap();
         let res = tvs.get_version().unwrap();
-        assert_eq!(
-            res,
-            Some(version.to_string()),
-            "saved and loaded version should match"
-        );
+        assert_eq!(res, Some(version.to_string()), "saved and loaded version should match");
     }
 
     #[rstest]
     #[case(FIXTURE_TOOL2_LOCAL, "test set local tool")]
     #[case(("tool1", "v1.4"), "test update existing local tool")]
-    fn save_local_sets_local_version_correctly(
-        #[case] tool_and_version: (&str, &str),
-        #[case] msg: &str,
-    ) {
+    fn save_local_sets_local_version_correctly(#[case] tool_and_version: (&str, &str), #[case] msg: &str) {
         let (global_file, current_dir) = gen_tool_versions_fixture();
         let (tool, version) = tool_and_version;
         let tvs = ToolVersions::new(&global_file, &current_dir, tool);
         tvs.save_local(&version).unwrap();
         let res = tvs.get_version().unwrap();
-        assert_eq!(
-            res,
-            Some(version.to_string()),
-            "{}: loaded does not match saved",
-            msg
-        );
+        assert_eq!(res, Some(version.to_string()), "{}: loaded does not match saved", msg);
     }
 }
