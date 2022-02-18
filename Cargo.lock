@@ -28,7 +28,7 @@ checksum = "94a45b455c14666b85fc40a019e8ab9eb75e3a124e05494f5397122bc9eb06e0"
 
 [[package]]
 name = "asdfw"
-version = "0.1.0-m2"
+version = "0.1.0-m3-wip"
 dependencies = [
  "anyhow",
  "assert_fs",
