@@ -25,40 +25,24 @@ fn run() -> Result<i32> {
     if let Ok(_) = env::var(DEBUG_VARIABLE) {
         configure_log(&runtime)?;
     };
-    let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir)?;
+    let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir, &runtime.shims_dir, &runtime.shim_exe)?;
     let tool = shims
         .find_plugin(&exe_name)?
         .ok_or(anyhow!("No tool configured for the command: {}", &exe_name))?;
-    let tool_versions = ToolVersions::new(
-        &runtime.global_tool_versions_file,
-        &runtime.current_dir,
-        &tool,
-    );
+    let tool_versions = ToolVersions::new(&runtime.global_tool_versions_file, &runtime.current_dir, &tool);
     match tool_versions.get_version()? {
         Some(version) => match shims.get_full_executable_path(&exe_name, &tool, &version)? {
             Some(cmd) => exec(&cmd, args),
-            None => Err(anyhow!(
-                "Version '{}' of '{}' does not seems to be installed",
-                &version,
-                &tool
-            )),
+            None => Err(anyhow!("Version '{}' of '{}' does not seems to be installed", &version, &tool)),
         },
-        None => Err(anyhow!(
-            "You don't have a version configured for '{}' ({})",
-            &exe_name,
-            &tool
-        )),
+        None => Err(anyhow!("You don't have a version configured for '{}' ({})", &exe_name, &tool)),
     }
 }
 
 fn configure_log(runtime: &RuntimeEnvironment) -> Result<LoggerHandle> {
     Ok(Logger::try_with_str("debug")?
         .log_to_file(FileSpec::default().directory(&runtime.log_dir))
-        .rotate(
-            Criterion::Size(100_000),
-            Naming::Numbers,
-            Cleanup::KeepLogFiles(6),
-        )
+        .rotate(Criterion::Size(100_000), Naming::Numbers, Cleanup::KeepLogFiles(6))
         .append()
         .start()?)
 }
