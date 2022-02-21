@@ -70,7 +70,7 @@ impl Paths {
 }
 
 #[rustfmt::skip]
-pub fn fixture_installed_tools<'a>(dir: &'a ChildPath) {
+pub fn fixture_installed_tools(dir: &'_ ChildPath) {
     dir.child("mytool1").child("1.2.4").child("bin").create_dir_all().unwrap();
     dir.child("mytool1").child("1.2.4").child("bin").child("cmd1.exe").touch().unwrap();
     dir.child("mytool1").child("1.1").child("bin").create_dir_all().unwrap();

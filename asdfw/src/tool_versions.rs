@@ -85,17 +85,17 @@ impl<'a> ToolVersions<'a> {
 
 fn set_tool_version<'a>(path: &'a Path, tool: &'a str, version: &'a str) -> Result<()> {
     debug!("reading current tool versions from {:?}", &path);
-    let mut tool_versions = load_file(&path)?;
+    let mut tool_versions = load_file(path)?;
     let previous = tool_versions.insert(tool.to_string(), version.to_string());
     if previous.is_none() {
         debug!("setting new version for {}", &tool);
     } else {
         debug!("Setting updated version for {}", &tool);
     }
-    save_file(tool_versions, &path)
+    save_file(tool_versions, path)
 }
 
-fn load_file<'a>(path: &'a Path) -> Result<ToolVersionsData> {
+fn load_file(path: &'_ Path) -> Result<ToolVersionsData> {
     if !path.exists() {
         info!("Tool versions file '{:?}' does not exist. Returning empty versions.", &path);
         return Ok(HashMap::new());
@@ -111,7 +111,7 @@ fn load_file<'a>(path: &'a Path) -> Result<ToolVersionsData> {
     Ok(data)
 }
 
-fn save_file<'a>(data: ToolVersionsData, path: &'a Path) -> Result<()> {
+fn save_file(data: ToolVersionsData, path: &'_ Path) -> Result<()> {
     let pairs = Vec::from_iter(data.iter());
     let mut strings = pairs.iter().map(|(k, v)| format!("{} {}", k, v)).collect::<Vec<String>>();
     strings.push("".to_owned());
@@ -129,25 +129,25 @@ fn search_tool_in_file<'a>(search_for: &'a str, path: &'a Path) -> Result<Option
             return Ok(Some(ver.to_owned()));
         }
     }
-    return Ok(None);
+    Ok(None)
 }
 
-fn parse_line<'a>(line: &'a str) -> Result<(&str, &str)> {
+fn parse_line(line: &'_ str) -> Result<(&str, &str)> {
     let mk_error = || anyhow!("Invalid tools versions line: {}", &line);
 
-    let result = line.split_once(" ").ok_or(mk_error());
+    let result = line.split_once(" ").ok_or_else(mk_error);
     if let Ok((tool, ver)) = result {
         if tool.is_empty() || ver.is_empty() {
             return Err(mk_error());
         }
-        if ver.contains(" ") {
+        if ver.contains(' ') {
             return Err(mk_error());
         }
     }
     result
 }
 
-fn env_var_name_for_tool<'a>(tool: &'a str) -> String {
+fn env_var_name_for_tool(tool: &'_ str) -> String {
     format!("ASDFW_{}_VERSION", String::from(tool).to_uppercase())
 }
 
@@ -227,8 +227,8 @@ mod tests {
     fn get_version_when_environment_variable_is_set() {
         let tool = "justfortest";
         let (global_file, current_dir) = gen_tool_versions_fixture();
-        let tool_versions = ToolVersions::new(global_file.path(), &current_dir.path(), tool);
-        let custom_env = env_var_name_for_tool(&tool);
+        let tool_versions = ToolVersions::new(global_file.path(), current_dir.path(), tool);
+        let custom_env = env_var_name_for_tool(tool);
         let expected = "1.1.1".to_string();
         std::env::set_var(&custom_env, &expected);
         let result = tool_versions.get_version().unwrap();
@@ -240,7 +240,7 @@ mod tests {
     fn get_version_from_local_file() {
         let (global_file, current_dir) = gen_tool_versions_fixture();
         let (tool, ver) = FIXTURE_TOOL1_LOCAL;
-        let tool_versions = ToolVersions::new(global_file.path(), &current_dir.path(), tool);
+        let tool_versions = ToolVersions::new(global_file.path(), current_dir.path(), tool);
         let result = tool_versions.get_version().unwrap();
         assert_eq!(result, Some(ver.to_string()));
     }
@@ -270,8 +270,8 @@ mod tests {
         let global_file = assert_fs::NamedTempFile::new(FILE_NAME).unwrap();
         let current_dir = assert_fs::TempDir::new().unwrap();
         let (tool, version) = FIXTURE_TOOL1_GLOBAL;
-        let tvs = ToolVersions::new(&global_file, &current_dir, &tool);
-        tvs.save_global(&version).unwrap();
+        let tvs = ToolVersions::new(&global_file, &current_dir, tool);
+        tvs.save_global(version).unwrap();
         let res = tvs.get_version().unwrap();
         assert_eq!(res, Some(version.to_string()), "saved and loaded version should match");
     }
@@ -288,7 +288,7 @@ mod tests {
         global_file.write_str(global).unwrap();
         let current_dir = assert_fs::TempDir::new().unwrap();
         let (tool, version) = tool_and_version;
-        let tvs = ToolVersions::new(&global_file, &current_dir, &tool);
+        let tvs = ToolVersions::new(&global_file, &current_dir, tool);
         tvs.save_global(version).unwrap();
         let res = tvs.get_version().unwrap();
 
@@ -301,8 +301,8 @@ mod tests {
         global_file.write_str(FIXTURE_GLOBAL).unwrap();
         let current_dir = assert_fs::TempDir::new().unwrap();
         let (tool, version) = FIXTURE_TOOL1_LOCAL;
-        let tvs = ToolVersions::new(&global_file, &current_dir, &tool);
-        tvs.save_local(&version).unwrap();
+        let tvs = ToolVersions::new(&global_file, &current_dir, tool);
+        tvs.save_local(version).unwrap();
         let res = tvs.get_version().unwrap();
         assert_eq!(res, Some(version.to_string()), "saved and loaded version should match");
     }
@@ -314,7 +314,7 @@ mod tests {
         let (global_file, current_dir) = gen_tool_versions_fixture();
         let (tool, version) = tool_and_version;
         let tvs = ToolVersions::new(&global_file, &current_dir, tool);
-        tvs.save_local(&version).unwrap();
+        tvs.save_local(version).unwrap();
         let res = tvs.get_version().unwrap();
         assert_eq!(res, Some(version.to_string()), "{}: loaded does not match saved", msg);
     }

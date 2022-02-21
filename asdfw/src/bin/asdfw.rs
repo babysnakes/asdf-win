@@ -84,18 +84,18 @@ fn do_main(app: Cli) -> Result<()> {
         1 => "debug",
         _ => "trace",
     };
-    log_to_file(&env, &log_level)?;
+    log_to_file(&env, log_level)?;
 
     run(app, &env)
 }
 
 fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
     match app.command {
-        CliSubCommand::Reshim { cleanup } => reshim(&env, cleanup),
+        CliSubCommand::Reshim { cleanup } => reshim(env, cleanup),
         CliSubCommand::Local { tool, version } => set_local(env, &tool, &version),
         CliSubCommand::Global { tool, version } => set_global(env, &tool, &version),
         CliSubCommand::Completion => gen_completions(),
-        CliSubCommand::Which { cmd } => which(&env, &cmd),
+        CliSubCommand::Which { cmd } => which(env, &cmd),
     }
 }
 
@@ -106,35 +106,39 @@ fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
     shims.save_db(&db)?;
     shims.create_shims(cleanup)?;
     let output = success_message("Reshim finished successfully.");
-    Ok(print_out(output))
+    print_out(output);
+    Ok(())
 }
 
 fn set_global<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
-    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
-    tvs.save_global(&version)?;
+    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, tool);
+    tvs.save_global(version)?;
     let msg = format!("Successfully configured global version ({}) for {}", &version, &tool);
     let output = success_message(&msg);
-    Ok(print_out(output))
+    print_out(output);
+    Ok(())
 }
 
-fn gen_completions<'a>() -> Result<()> {
+fn gen_completions() -> Result<()> {
     let mut app = Cli::into_app();
     generate(PowerShell, &mut app, APP_NAME, &mut std::io::stdout());
     Ok(())
 }
 
 fn set_local<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> Result<()> {
-    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
-    tvs.save_local(&version)?;
+    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, tool);
+    tvs.save_local(version)?;
     let msg = format!("Successfully configured local version ({}) for {}", &version, &tool);
     let output = success_message(&msg);
-    Ok(print_out(output))
+    print_out(output);
+    Ok(())
 }
 
 fn which(env: &RuntimeEnvironment, cmd: &str) -> Result<()> {
     info!("invoked `which` on {}", &cmd);
     let path = find_path_for_cmd(env, cmd)?;
-    Ok(print_out(vec![path]))
+    print_out(vec![path]);
+    Ok(())
 }
 
 fn log_to_file(env: &RuntimeEnvironment, spec: &str) -> Result<LoggerHandle> {

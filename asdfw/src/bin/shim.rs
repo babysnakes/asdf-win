@@ -22,16 +22,16 @@ fn run() -> Result<i32> {
     let exe_name = me.file_name().unwrap().to_str().unwrap();
     let args = env::args().skip(1);
     let runtime = RuntimeEnvironment::new()?;
-    if let Ok(_) = env::var(DEBUG_VARIABLE) {
+    if env::var(DEBUG_VARIABLE).is_ok() {
         configure_log(&runtime)?;
     };
     let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir, &runtime.shims_dir, &runtime.shim_exe)?;
     let tool = shims
-        .find_plugin(&exe_name)?
-        .ok_or(anyhow!("No tool configured for the command: {}", &exe_name))?;
+        .find_plugin(exe_name)?
+        .ok_or_else(|| anyhow!("No tool configured for the command: {}", &exe_name))?;
     let tool_versions = ToolVersions::new(&runtime.global_tool_versions_file, &runtime.current_dir, &tool);
     match tool_versions.get_version()? {
-        Some(version) => match shims.get_full_executable_path(&exe_name, &tool, &version)? {
+        Some(version) => match shims.get_full_executable_path(exe_name, &tool, &version)? {
             Some(cmd) => exec(&cmd, args),
             None => Err(anyhow!("Version '{}' of '{}' does not seems to be installed", &version, &tool)),
         },

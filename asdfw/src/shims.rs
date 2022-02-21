@@ -5,7 +5,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const EXTENSIONS: &'static [&str] = &["exe"];
+const EXTENSIONS: &[&str] = &["exe"];
 
 pub type ShimsDB = HashMap<String, String>;
 
@@ -59,7 +59,7 @@ impl<'a> Shims<'a> {
             .tools_install_dir
             .to_str()
             .ok_or(anyhow!("Couldn't parse install dir as string."))?;
-        let path: PathBuf = [&root, tool, version, "bin", exe].iter().collect();
+        let path: PathBuf = [root, tool, version, "bin", exe].iter().collect();
         Ok(if path.exists() { Some(path) } else { None })
     }
 
@@ -70,7 +70,7 @@ impl<'a> Shims<'a> {
                 .file_name()
                 .into_string()
                 .map_err(|e| anyhow!("could not convert {:?} to string", e))?;
-            if exe == &name {
+            if exe == name {
                 return Ok(Some(name));
             }
             for ext in EXTENSIONS.iter() {
@@ -148,7 +148,7 @@ fn valid_exe_extension(extension: Option<&OsStr>) -> bool {
             return true;
         }
     }
-    return false;
+    false
 }
 
 #[cfg(test)]
@@ -221,7 +221,7 @@ mod tests {
         for n in existing_shims {
             paths.shims_dir.child(&n).touch().unwrap();
         }
-        let result = shims.resolve_command(&exe).unwrap();
+        let result = shims.resolve_command(exe).unwrap();
         assert_eq!(result, expected, "test case: {}", &msg);
     }
 

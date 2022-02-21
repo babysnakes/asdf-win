@@ -29,6 +29,7 @@ function buildRelease {
     }
     Write-Debug "Running tests"
     cargo test
+    cargo clippy --all-targets --all-features -- -D warnings
     failIfCommandFailed "Tests failed"
     Write-Debug "Building release"
     cargo build --release
