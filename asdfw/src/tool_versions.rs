@@ -135,7 +135,7 @@ fn search_tool_in_file<'a>(search_for: &'a str, path: &'a Path) -> Result<Option
 fn parse_line(line: &'_ str) -> Result<(&str, &str)> {
     let mk_error = || anyhow!("Invalid tools versions line: {}", &line);
 
-    let result = line.split_once(" ").ok_or_else(mk_error);
+    let result = line.split_once(' ').ok_or_else(mk_error);
     if let Ok((tool, ver)) = result {
         if tool.is_empty() || ver.is_empty() {
             return Err(mk_error());

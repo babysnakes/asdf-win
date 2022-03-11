@@ -41,7 +41,7 @@ impl<'a> Plugin<'a> {
         match &self.config {
             None => vec![DEFAULT_DIR.to_string()],
             Some(config) => {
-                let dirs = config.bin_dirs.clone().unwrap_or(vec![]);
+                let dirs = config.bin_dirs.clone().unwrap_or_default();
                 if dirs.is_empty() {
                     vec![DEFAULT_DIR.to_string()]
                 } else {
