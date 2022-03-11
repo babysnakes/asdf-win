@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use asdfw::runtime::RuntimeEnvironment;
 use asdfw::shims::Shims;
 use asdfw::subcommand::exec;
 use asdfw::tool_versions::ToolVersions;
+use asdfw::{plugins::plugin_manager::PluginManager, runtime::RuntimeEnvironment};
 use flexi_logger::*;
 use std::{env, process};
 
@@ -25,7 +25,8 @@ fn run() -> Result<i32> {
     if env::var(DEBUG_VARIABLE).is_ok() {
         configure_log(&runtime)?;
     };
-    let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir, &runtime.shims_dir, &runtime.shim_exe)?;
+    let pm = PluginManager::new(&runtime.plugins_dir);
+    let shims = Shims::new(&runtime.shims_db, &runtime.installs_dir, &runtime.shims_dir, &runtime.shim_exe, pm)?;
     let tool = shims
         .find_plugin(exe_name)?
         .ok_or_else(|| anyhow!("No tool configured for the command: {}", &exe_name))?;

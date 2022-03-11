@@ -9,6 +9,7 @@ pub struct RuntimeEnvironment {
     pub installs_dir: PathBuf,
     pub shims_dir: PathBuf,
     pub shim_exe: PathBuf,
+    pub plugins_dir: PathBuf,
     pub log_dir: PathBuf,
     pub global_tool_versions_file: PathBuf,
 }
@@ -22,6 +23,7 @@ impl RuntimeEnvironment {
         let installs_dir = app_dir.join("installs");
         let shims_dir = app_dir.join("shims");
         let shim_exe = app_dir.join("lib").join("shim.exe");
+        let plugins_dir = app_dir.join("plugins");
         let log_dir = app_dir.join("logs");
         let global_tool_versions_file = home_dir.join(".tool-versions");
         Ok(RuntimeEnvironment {
@@ -31,6 +33,7 @@ impl RuntimeEnvironment {
             installs_dir,
             shims_dir,
             shim_exe,
+            plugins_dir,
             log_dir,
             global_tool_versions_file,
         })

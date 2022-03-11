@@ -1,10 +1,13 @@
 use anyhow::{anyhow, Context, Result};
 use log::debug;
 
-use crate::{runtime::RuntimeEnvironment, shims::Shims, tool_versions::ToolVersions};
+use crate::{
+    plugins::plugin_manager::PluginManager, runtime::RuntimeEnvironment, shims::Shims, tool_versions::ToolVersions,
+};
 
 pub fn find_path_for_cmd(env: &RuntimeEnvironment, cmd: &str) -> Result<String> {
-    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe)?;
+    let pm = PluginManager::new(&env.plugins_dir);
+    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe, pm)?;
     let context = format!("resolving command ({})", &cmd);
     let cmd_name = shims.resolve_command(cmd).context(context)?.unwrap_or_else(|| cmd.to_string());
     debug!("Command '{}' resolved to: '{}'", &cmd, &cmd_name);

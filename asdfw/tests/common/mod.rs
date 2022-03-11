@@ -1,4 +1,5 @@
 use asdfw::{
+    plugins::plugin_manager::PluginManager,
     runtime::RuntimeEnvironment,
     shims::{Shims, ShimsDB},
 };
@@ -11,6 +12,7 @@ pub struct Paths {
     pub installs_dir: ChildPath,
     pub shims_dir: ChildPath,
     pub shim_exe: ChildPath,
+    pub plugins_dir: ChildPath,
     pub log_dir: ChildPath,
     pub global_tool_versions_file: ChildPath,
 }
@@ -36,6 +38,7 @@ impl Paths {
         let shim_exe = root.child("shim.exe");
         shim_exe.touch().unwrap();
         let shims_db = root.child("shims.db");
+        let plugins_dir = root.child("plugins");
         Paths {
             current_dir,
             home_dir,
@@ -44,6 +47,7 @@ impl Paths {
             shims_dir,
             log_dir,
             shim_exe,
+            plugins_dir,
             global_tool_versions_file,
         }
     }
@@ -57,12 +61,14 @@ impl Paths {
             shims_dir: self.shims_dir.to_path_buf(),
             log_dir: self.log_dir.to_path_buf(),
             shim_exe: self.shim_exe.to_path_buf(),
+            plugins_dir: self.plugins_dir.to_path_buf(),
             global_tool_versions_file: self.global_tool_versions_file.to_path_buf(),
         }
     }
 
     pub fn generate_shims_db(&self) -> ShimsDB {
-        let shims = Shims::new(&self.shims_db, &self.installs_dir, &self.shims_dir, &self.shim_exe).unwrap();
+        let pm = PluginManager::new(&self.plugins_dir);
+        let shims = Shims::new(&self.shims_db, &self.installs_dir, &self.shims_dir, &self.shim_exe, pm).unwrap();
         let db = shims.generate_db_from_installed_tools().unwrap();
         shims.save_db(&db).unwrap();
         db

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use asdfw::common::*;
+use asdfw::plugins::plugin_manager::PluginManager;
 use asdfw::runtime::RuntimeEnvironment;
 use asdfw::shims::Shims;
 use asdfw::{output::*, tool_versions::ToolVersions};
@@ -101,7 +102,8 @@ fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
 
 fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
     info!("Create shims requested");
-    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe)?;
+    let pm = PluginManager::new(&env.plugins_dir);
+    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe, pm)?;
     let db = shims.generate_db_from_installed_tools()?;
     shims.save_db(&db)?;
     shims.create_shims(cleanup)?;

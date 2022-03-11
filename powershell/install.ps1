@@ -13,7 +13,8 @@ $requiredDirs = @(
     "installs",
     "lib",
     "logs",
-    "shims"
+    "shims",
+    "plugins"
 )
 
 $ASDFWDir = Join-Path $HOME ".asdfw"
