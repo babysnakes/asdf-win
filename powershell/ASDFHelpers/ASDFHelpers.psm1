@@ -1,5 +1,7 @@
 $ASDFDir = Join-Path $HOME ".asdfw"
 $ASDFInstallDir = Join-Path $ASDFDir "installs"
+$ASDFPluginsDir = Join-Path $ASDFDir "plugins"
+$ASDFPluginFileName = "plugin.yaml"
 
 <#
 .Description
@@ -73,4 +75,36 @@ function New-ASDFInstallDir {
     Write-Host "update ${HOME}\.tool-versions ..."
 }
 
-Export-ModuleMember -Function New-ASDFInstallDir, Set-ASDFToolVersion
+<#
+.Description
+Creates a skeleton ASDFW plugin config - Just until we'll have a proper plugins
+system.
+#>
+function New-ASDFPluginSkeleton {
+    param (
+        # The tool name (plugin name) to create the plugin file for
+        [Parameter(Mandatory, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $ToolName
+    )
+    $pluginDir = Join-Path $ASDFPluginsDir $ToolName
+    if (-Not (Test-Path -Path $pluginDir)) {
+        mkdir $pluginDir | Out-Null
+    }
+    $pluginFile = Join-Path $pluginDir $ASDFPluginFileName
+    if (Test-Path -Path $pluginFile) {
+        Write-Host " " -NoNewline -ForegroundColor Red
+        Write-Host "Plugin file (${pluginFile}) already exists. Exiting."
+    }
+    else {
+        New-Item $pluginFile | Out-Null
+        Add-Content -Path $pluginFile -Value "---"
+        Add-Content -Path $pluginFile -Value "bin_dirs:"
+        Add-Content -Path $pluginFile -Value "  - bin"
+        Write-Host " " -NoNewline -ForegroundColor Green
+        Write-Host "Plugin File created: ${pluginFile}. Edit to match your needs."
+        Write-Host ""
+    }
+}
+
+Export-ModuleMember -Function New-ASDFInstallDir, Set-ASDFToolVersion, Remove-ASDFToolVersion, New-ASDFPluginSkeleton
