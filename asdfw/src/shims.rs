@@ -60,12 +60,19 @@ impl<'a> Shims<'a> {
 
     /// Returns the full path to the shimmed executable.
     pub fn get_full_executable_path(&self, exe: &str, tool: &str, version: &str) -> Result<Option<PathBuf>> {
-        let root = self
-            .tools_install_dir
-            .to_str()
-            .ok_or(anyhow!("Couldn't parse install dir as string."))?;
-        let path: PathBuf = [root, tool, version, "bin", exe].iter().collect();
-        Ok(if path.exists() { Some(path) } else { None })
+        let mut base_path = self.tools_install_dir.join(&tool);
+        base_path.push(&version);
+        let plugin = &self.plugin_manager.get_plugin(tool).with_context(|| "some context")?;
+        let bindirs = plugin.get_bin_directories();
+        for dir in bindirs {
+            let mut path = base_path.clone();
+            path.push(&dir);
+            path.push(exe);
+            if path.exists() {
+                return Ok(Some(path));
+            }
+        }
+        Ok(None)
     }
 
     /// Resolve executable name as shim even if entered without extension.
@@ -205,6 +212,30 @@ mod tests {
             ("kubectx.exe".to_string(), "kubectx".to_string()),
             ("kubens.exe".to_string(), "kubectx".to_string()),
         ])
+    }
+
+    /// Generates a `mytool` tool plugin (version 1.0) and installation with two
+    /// binaries (and custom bin dirs):
+    /// - mytool\1.0\bin1\tool-bin1.exe
+    /// - mytool\1.0\some\bin2\tool-bin2.exe
+    /// -
+    fn custom_bin_dirs_fixture(tmpdir: &TempDir) -> TestPaths {
+        let tool = "mytool";
+        let paths = test_paths(tmpdir);
+        let my_plugin_dir = paths.plugins_dir.child(tool);
+        my_plugin_dir.create_dir_all().unwrap();
+        let my_plugin_config = my_plugin_dir.child(PLUGIN_FILENAME);
+        my_plugin_config.write_str("---\nbin_dirs:\n  - bin1\n  - some\\bin2").unwrap();
+        let tooldir = paths.tools_install_dir.child(tool).child("1.0");
+        let bin1_dir = tooldir.child("bin1");
+        let bin2_dir = tooldir.child("some").child("bin2");
+        bin1_dir.create_dir_all().unwrap();
+        bin2_dir.create_dir_all().unwrap();
+        let bin1 = bin1_dir.child("tool-bin1.exe");
+        let bin2 = bin2_dir.child("tool-bin2.exe");
+        bin1.touch().unwrap();
+        bin2.touch().unwrap();
+        paths
     }
 
     #[test]
@@ -364,6 +395,50 @@ mod tests {
     }
 
     #[test]
+    fn get_full_executable_path_with_non_default_path_should_work() {
+        let tmpdir = TempDir::new().unwrap();
+        let paths = custom_bin_dirs_fixture(&tmpdir);
+        let pm = PluginManager::new(&paths.plugins_dir);
+        let shims =
+            Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let db = shims.generate_db_from_installed_tools().unwrap();
+        shims.save_db(&db).unwrap();
+        let result = shims.get_full_executable_path("tool-bin1.exe", "mytool", "1.0").unwrap();
+        assert!(result.is_some(), "should have received valid path, got None!");
+        let result = result.unwrap();
+        let result_path = result.to_str().unwrap();
+        let expected = r"mytool\1.0\bin1\tool-bin1.exe";
+        assert!(
+            result_path.ends_with(&expected),
+            "'{}' does not end with '{}'",
+            result_path,
+            expected
+        );
+    }
+
+    #[test]
+    fn get_full_executable_path_with_nultiple_paths_should_loop_through_path() {
+        let tmpdir = TempDir::new().unwrap();
+        let paths = custom_bin_dirs_fixture(&tmpdir);
+        let pm = PluginManager::new(&paths.plugins_dir);
+        let shims =
+            Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let db = shims.generate_db_from_installed_tools().unwrap();
+        shims.save_db(&db).unwrap();
+        let result = shims.get_full_executable_path("tool-bin2.exe", "mytool", "1.0").unwrap();
+        assert!(result.is_some(), "should have received valid path, got None!");
+        let result = result.unwrap();
+        let result_path = result.to_str().unwrap();
+        let expected = r"mytool\1.0\some\bin2\tool-bin2.exe";
+        assert!(
+            result_path.ends_with(&expected),
+            "'{}' does not end with '{}'",
+            result_path,
+            expected
+        );
+    }
+
+    #[test]
     #[rustfmt::skip]
     fn create_shims_without_cleanup_should_create_shims_that_exists_in_the_db() {
         let db = test_data();
@@ -413,22 +488,8 @@ mod tests {
 
     #[test]
     fn generate_shims_db_with_plugin_that_contains_multiple_bin_dirs_should_include_bins_from_all_dirs() {
-        let tool = "mytool";
         let tmpdir = TempDir::new().unwrap();
-        let paths = test_paths(&tmpdir);
-        let my_plugin_dir = paths.plugins_dir.child(tool);
-        my_plugin_dir.create_dir_all().unwrap();
-        let my_plugin_config = my_plugin_dir.child(PLUGIN_FILENAME);
-        my_plugin_config.write_str("---\nbin_dirs:\n  - bin1\n  - some\\bin2").unwrap();
-        let tooldir = paths.tools_install_dir.child(tool).child("1.0");
-        let bin1_dir = tooldir.child("bin1");
-        let bin2_dir = tooldir.child("some").child("bin2");
-        bin1_dir.create_dir_all().unwrap();
-        bin2_dir.create_dir_all().unwrap();
-        let bin1 = bin1_dir.child("tool-bin1.exe");
-        let bin2 = bin2_dir.child("tool-bin2.exe");
-        bin1.touch().unwrap();
-        bin2.touch().unwrap();
+        let paths = custom_bin_dirs_fixture(&tmpdir);
         let pm = PluginManager::new(&paths.plugins_dir);
         let shims =
             Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
