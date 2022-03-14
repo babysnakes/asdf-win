@@ -62,7 +62,10 @@ impl<'a> Shims<'a> {
     pub fn get_full_executable_path(&self, exe: &str, tool: &str, version: &str) -> Result<Option<PathBuf>> {
         let mut base_path = self.tools_install_dir.join(&tool);
         base_path.push(&version);
-        let plugin = &self.plugin_manager.get_plugin(tool).with_context(|| "some context")?;
+        let plugin = &self
+            .plugin_manager
+            .get_plugin(tool)
+            .with_context(|| format!("getting plugin for {tool}"))?;
         let bindirs = plugin.get_bin_directories();
         for dir in bindirs {
             let mut path = base_path.clone();
