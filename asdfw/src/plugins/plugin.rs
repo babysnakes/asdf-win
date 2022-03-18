@@ -10,13 +10,19 @@ pub const PLUGIN_FILENAME: &str = "plugin.yaml";
 pub struct Plugin<'a> {
     pub name: &'a str,
     pub dir: PathBuf,
-    config: Option<PluginConfig>,
+    pub config: PluginConfig,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PluginConfig {
-    #[serde(default)]
-    bin_dirs: Option<Vec<String>>,
+    #[serde(default = "PluginConfig::default_bin_dirs")]
+    pub bin_dirs: Vec<String>,
+}
+
+impl PluginConfig {
+    fn default_bin_dirs() -> Vec<String> {
+        vec![DEFAULT_DIR.to_string()]
+    }
 }
 
 impl<'a> Plugin<'a> {
@@ -26,9 +32,18 @@ impl<'a> Plugin<'a> {
             let f = File::open(plugin_file).with_context(|| format!("opening plugin config file for '{name}'"))?;
             let config: PluginConfig =
                 serde_yaml::from_reader(f).with_context(|| format!("Parsing plugin config for '{name}'"))?;
-            Some(config)
+            if config.bin_dirs.is_empty() {
+                PluginConfig {
+                    bin_dirs: PluginConfig::default_bin_dirs(),
+                    ..config
+                }
+            } else {
+                config
+            }
         } else {
-            None
+            PluginConfig {
+                bin_dirs: PluginConfig::default_bin_dirs(),
+            }
         };
         Ok(Plugin {
             name,
@@ -36,51 +51,39 @@ impl<'a> Plugin<'a> {
             dir: path,
         })
     }
-
-    pub fn get_bin_directories(&self) -> Vec<String> {
-        match &self.config {
-            None => vec![DEFAULT_DIR.to_string()],
-            Some(config) => {
-                let dirs = config.bin_dirs.clone().unwrap_or_default();
-                if dirs.is_empty() {
-                    vec![DEFAULT_DIR.to_string()]
-                } else {
-                    dirs
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use assert_fs::{prelude::*, TempDir};
+    use rstest::rstest;
 
     #[test]
-    fn plugin_new_with_config_should_return_some_config() {
+    fn plugin_new_with_config_should_return_parsed_config() {
         let tool = "mytool";
         let yaml = "---\nbin_dirs:\n  - some/dir\n  - otherdir";
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
         plugin_yaml.write_str(yaml).unwrap();
-        let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
-        assert_eq!(result.name, tool);
-        assert!(result.config.is_some(), "expected some config, received None");
-        assert_eq!(
-            result.config.unwrap().bin_dirs.unwrap(),
-            vec!["some/dir".to_string(), "otherdir".to_string()]
-        );
+        let plugin = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
+        assert_eq!(plugin.name, tool);
+        assert_eq!(plugin.config.bin_dirs, vec!["some/dir".to_string(), "otherdir".to_string()]);
     }
 
     #[test]
-    fn plugin_new_without_config_should_return_none() {
+    fn plugin_new_without_config_should_return_config_default_values() {
         let tool = "mytool";
         let tmpdir = TempDir::new().unwrap();
         let plugin_dir = tmpdir.child(tool);
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
         assert_eq!(result.name, tool);
-        assert!(result.config.is_none(), "expected config to be None, got: {:?}", result.config);
+        assert_eq!(
+            result.config.bin_dirs,
+            PluginConfig::default_bin_dirs(),
+            "expected config to be None, got: {:?}",
+            result.config
+        );
     }
 
     #[test]
@@ -96,7 +99,7 @@ mod test {
     }
 
     #[test]
-    fn plugin_get_bin_directories_returns_bin_directories_if_supplied() {
+    fn plugin_should_return_provided_bin_directories() {
         let tool = "mytool";
         let yaml = "---\nbin_dirs:\n  - some/dir\n  - otherdir";
         let plugin_dir = TempDir::new().unwrap();
@@ -104,28 +107,30 @@ mod test {
         plugin_yaml.write_str(yaml).unwrap();
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
         let expected = vec!["some/dir", "otherdir"];
-        assert_eq!(result.get_bin_directories(), expected);
+        assert_eq!(result.config.bin_dirs, expected);
     }
 
     #[test]
-    fn plugin_get_bin_directories_return_default_bin_directories_if_no_config_exists() {
+    fn plugin_should_return_default_bin_directories_if_no_config_file_exists() {
         let tool = "mytool";
         let tmpdir = TempDir::new().unwrap();
         let plugin_dir = tmpdir.child(tool);
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
         let expected = vec!["bin"];
-        assert_eq!(result.get_bin_directories(), expected);
+        assert_eq!(result.config.bin_dirs, expected);
     }
 
-    #[test]
-    fn plugin_get_bin_directories_return_default_bin_directories_if_empty_in_config() {
+    #[rstest]
+    #[case("---\nbin_dirs: []\n", "explicit empty bin dirs")]
+    #[case("---\nsome_list: []\n", "absent bin dirs")]
+    fn plugin_should_return_default_bin_directories_if_empty_in_config(#[case] yml: &str, #[case] msg: &str) {
         let tool = "mytool";
-        let yaml = "---\nbin_dirs:\n";
+        let yaml = yml;
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
         plugin_yaml.write_str(yaml).unwrap();
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
         let expected = vec!["bin"];
-        assert_eq!(result.get_bin_directories(), expected);
+        assert_eq!(result.config.bin_dirs, expected, "expected default config (test case: {})", &msg);
     }
 }

@@ -66,7 +66,7 @@ impl<'a> Shims<'a> {
             .plugin_manager
             .get_plugin(tool)
             .with_context(|| format!("getting plugin for {tool}"))?;
-        let bindirs = plugin.get_bin_directories();
+        let bindirs = &plugin.config.bin_dirs;
         for dir in bindirs {
             let mut path = base_path.clone();
             path.push(&dir);
@@ -134,7 +134,7 @@ impl<'a> Shims<'a> {
                         .plugin_manager
                         .get_plugin(&tool)
                         .with_context(|| format!("loading plugin for {}", &tool))?;
-                    for bin_dir in plugin.get_bin_directories() {
+                    for bin_dir in &plugin.config.bin_dirs {
                         let mut path = version.path();
                         path.push(bin_dir);
                         for exe in fs::read_dir(path)? {
