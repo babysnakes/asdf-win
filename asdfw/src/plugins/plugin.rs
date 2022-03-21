@@ -17,6 +17,24 @@ pub struct Plugin<'a> {
 pub struct PluginConfig {
     #[serde(default = "PluginConfig::default_bin_dirs")]
     pub bin_dirs: Vec<String>,
+    #[serde(default)]
+    pub env_vars: Vec<EnvVar>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde()]
+pub struct EnvVar {
+    name: String,
+    value: EnvVarValue,
+    #[serde(default)]
+    overriding_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum EnvVarValue {
+    Value { value: String },
+    RelativeInstallPath { relative_inst_path: String },
 }
 
 impl PluginConfig {
@@ -43,6 +61,7 @@ impl<'a> Plugin<'a> {
         } else {
             PluginConfig {
                 bin_dirs: PluginConfig::default_bin_dirs(),
+                env_vars: vec![],
             }
         };
         Ok(Plugin {
@@ -58,6 +77,7 @@ mod test {
     use super::*;
     use assert_fs::{prelude::*, TempDir};
     use rstest::rstest;
+    use stripmargin::StripMargin;
 
     #[test]
     fn plugin_new_with_config_should_return_parsed_config() {
@@ -132,5 +152,89 @@ mod test {
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
         let expected = vec!["bin"];
         assert_eq!(result.config.bin_dirs, expected, "expected default config (test case: {})", &msg);
+    }
+
+    #[rstest]
+    #[case(
+        r#"---
+          |bin_dirs:
+          |  - some/dir
+          |  - otherdir
+          |env_vars:
+          |  - name: MYENV
+          |    value:
+          |      value: "A Value"
+          |"#
+          .strip_margin(),
+          vec![
+            EnvVar {
+                name: "MYENV".to_string(),
+                overriding_name: None,
+                value: EnvVarValue::Value { value: "A Value".to_string() }
+            },
+          ],
+          "value env"
+    )]
+    #[case(
+        r#"---
+          |env_vars:
+          |  - name: MYENV
+          |    value:
+          |      relative_inst_path: "relative\\path"
+          |"#
+          .strip_margin(),
+          vec![
+            EnvVar {
+                name: "MYENV".to_string(),
+                overriding_name: None,
+                value: EnvVarValue::RelativeInstallPath { relative_inst_path: "relative\\path".to_string() }
+            },
+          ],
+          "relative path env"
+    )]
+    #[case(
+        r#"---
+          |env_vars:
+          |  - name: MYENV
+          |    value:
+          |      value: "A Value"
+          |    overriding_name: MYENV_OVERRIDE
+          |"#
+          .strip_margin(),
+          vec![
+            EnvVar {
+                name: "MYENV".to_string(),
+                overriding_name: Some("MYENV_OVERRIDE".to_string()),
+                value: EnvVarValue::Value { value: "A Value".to_string() }
+            },
+          ],
+          "A value with override"
+    )]
+    fn plugin_returns_provided_environment_variables(
+        #[case] yaml: String,
+        #[case] expected: Vec<EnvVar>,
+        #[case] msg: &str,
+    ) {
+        let tool = "mytool";
+        let plugin_dir = TempDir::new().unwrap();
+        let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
+        plugin_yaml.write_str(&yaml).unwrap();
+        let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
+        assert_eq!(result.config.env_vars, expected, "test case: {msg}");
+    }
+
+    #[rstest]
+    #[case(Some("---\nbin_dirs: []\n"), "config without reference to env vars")]
+    #[case(None, "no config file")]
+    fn plugin_without_provided_environment_variables_returns_none(#[case] yml: Option<&str>, #[case] msg: &str) {
+        let tool = "mytool";
+        let plugin_dir = TempDir::new().unwrap();
+        let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
+        if let Some(txt) = yml {
+            plugin_yaml.write_str(txt).unwrap();
+        }
+        let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
+        let expected: Vec<EnvVar> = vec![];
+        assert_eq!(result.config.env_vars, expected, "expected default env vars (test case: {})", &msg);
     }
 }

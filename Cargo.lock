@@ -41,6 +41,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_yaml",
+ "stripmargin",
  "textwrap",
  "winapi",
  "yansi",
@@ -598,6 +599,12 @@ name = "smawk"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f67ad224767faa3c7d8b6d91985b78e70a1324408abcb1cfcc2be4c06bc06043"
+
+[[package]]
+name = "stripmargin"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "784dea3618a8c4f8bba0af715e4075f6d743d766d46f7c3339525dd95776c004"
 
 [[package]]
 name = "strsim"

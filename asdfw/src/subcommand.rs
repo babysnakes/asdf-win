@@ -1,17 +1,21 @@
 use anyhow::{Context, Result};
 use std::{ffi::OsStr, path::Path, process::Command};
 
-/// A sort of `exec` implementation. Windows does not really have `exec` so we
-/// are wrapping the executable to run and returning it's exit code (passing all
-/// signals into the child process).
-pub fn exec<I, S>(cmd: &Path, args: I) -> Result<i32>
+pub fn mk_command<I, S>(cmd: &Path, args: I) -> Command
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let mut command = Command::new(&cmd);
     command.args(args);
-    imp::wrap_exec(&mut command).context(format!("Executing command: {:?}", &cmd))
+    command
+}
+
+/// A sort of `exec` implementation. Windows does not really have `exec` so we
+/// are wrapping the executable to run and returning it's exit code (passing all
+/// signals into the child process).
+pub fn exec(mut command: Command) -> Result<i32> {
+    imp::wrap_exec(&mut command).context(format!("Executing command: {:?}", &command.get_program()))
 }
 
 // The idea for this wrapping of executable was taken from cargo-utils
