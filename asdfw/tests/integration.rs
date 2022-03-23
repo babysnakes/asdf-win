@@ -78,7 +78,7 @@ fn which_with_version_configured_but_not_installed_should_return_matching_error(
     common::fixture_installed_tools(&paths.installs_dir);
     let db = paths.generate_shims_db();
     common::test_data_matching_shims(&paths.shims_dir, &db);
-    let result = find_path_for_cmd(&env, &cmd);
+    let result = find_path_for_cmd(&env, cmd);
     assert!(result.is_err(), "missing version should return error");
     let err = result.unwrap_err();
     let msg = format!("{err}");
@@ -112,7 +112,7 @@ fn which_with_specific_command_missing_should_return_matching_error() {
     common::fixture_installed_tools(&paths.installs_dir);
     let db = paths.generate_shims_db();
     common::test_data_matching_shims(&paths.shims_dir, &db);
-    let result = find_path_for_cmd(&env, &cmd1);
+    let result = find_path_for_cmd(&env, cmd1);
     assert!(result.is_err(), "missing version should return error");
     let err = result.unwrap_err();
     let msg = format!("{err}");

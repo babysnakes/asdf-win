@@ -122,14 +122,14 @@ mod tests {
         version: &'a str,
         plugin_yml: Option<&str>,
     ) -> ExecutableContextFuxture<'a> {
-        let paths = required_dirs(root, &tool);
+        let paths = required_dirs(root, tool);
         let tool_dir = paths.installs_dir.child(&tool).child(&version);
         if let Some(txt) = plugin_yml {
             let conf = paths.plugin_dir.child(PLUGIN_FILENAME);
             conf.write_str(txt).unwrap();
         }
         tool_dir.create_dir_all().unwrap();
-        let plugin = Plugin::new(&tool, paths.plugin_dir.to_path_buf()).unwrap();
+        let plugin = Plugin::new(tool, paths.plugin_dir.to_path_buf()).unwrap();
         let ec = ExecutableContext::new(cmd, plugin, version, &paths.installs_dir).unwrap();
         ExecutableContextFuxture { ec, tool_dir }
     }
@@ -139,11 +139,11 @@ mod tests {
         let tool = "mytool";
         let version = "0.1";
         let tmpdir = TempDir::new().unwrap();
-        let paths = required_dirs(&tmpdir, &tool);
+        let paths = required_dirs(&tmpdir, tool);
         let tool_dir = paths.installs_dir.child(&tool).child(&version);
         tool_dir.create_dir_all().unwrap();
-        let plugin = Plugin::new(&tool, paths.plugin_dir.to_path_buf()).unwrap();
-        let result = ExecutableContext::new("cmd.exe", plugin, &version, &paths.installs_dir).unwrap();
+        let plugin = Plugin::new(tool, paths.plugin_dir.to_path_buf()).unwrap();
+        let result = ExecutableContext::new("cmd.exe", plugin, version, &paths.installs_dir).unwrap();
         assert_eq!(result.tool_install_root, tool_dir.to_path_buf());
     }
 
@@ -152,9 +152,9 @@ mod tests {
         let tool = "mytool";
         let version = "0.1";
         let tmpdir = TempDir::new().unwrap();
-        let paths = required_dirs(&tmpdir, &tool);
-        let plugin = Plugin::new(&tool, paths.plugin_dir.to_path_buf()).unwrap();
-        let result = ExecutableContext::new("cmd.exe", plugin, &version, &paths.installs_dir);
+        let paths = required_dirs(&tmpdir, tool);
+        let plugin = Plugin::new(tool, paths.plugin_dir.to_path_buf()).unwrap();
+        let result = ExecutableContext::new("cmd.exe", plugin, version, &paths.installs_dir);
         assert!(result.is_none(), "should return none if install root does not exist");
     }
 
@@ -164,7 +164,7 @@ mod tests {
         let version = "0.1";
         let cmd = "cmd.exe";
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, None);
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         let bindir = fixture.tool_dir.child("bin");
         bindir.create_dir_all().unwrap();
         let exe = bindir.child(&cmd);
@@ -180,7 +180,7 @@ mod tests {
         let version = "0.1";
         let cmd = "cmd.exe";
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, None);
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         // do not create binary dir and file
         let result = fixture.ec.get_full_executable_path();
         assert!(result.is_none(), "if executable not found should return none");
@@ -197,7 +197,7 @@ mod tests {
             |  - some\dir
             |"#
         .strip_margin();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, Some(&yml));
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, Some(&yml));
         let bindir = fixture.tool_dir.child("some").child("dir");
         bindir.create_dir_all().unwrap();
         let exe = bindir.child(&cmd);
@@ -219,7 +219,7 @@ mod tests {
             |  - other\bin
             |"#
         .strip_margin();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, Some(&yml));
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, Some(&yml));
         let bindir1 = fixture.tool_dir.child("some").child("dir");
         bindir1.create_dir_all().unwrap();
         let bindir2 = fixture.tool_dir.child("other").child("bin");
@@ -237,7 +237,7 @@ mod tests {
         let version = "0.1";
         let cmd = "cmd.exe";
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, None);
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         let bindir = fixture.tool_dir.child("bin");
         bindir.create_dir_all().unwrap();
         let exe = bindir.child(&cmd);
@@ -253,7 +253,7 @@ mod tests {
         let version = "0.1";
         let cmd = "cmd.exe";
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, None);
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         let args: Vec<&str> = vec![];
         assert!(fixture.ec.mk_command(args).is_none(), "should return none on missing executable");
     }
@@ -264,7 +264,7 @@ mod tests {
         let version = "0.1";
         let cmd = "cmd.exe";
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, None);
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         let bindir = fixture.tool_dir.child("bin");
         bindir.create_dir_all().unwrap();
         let exe = bindir.child(&cmd);
@@ -282,7 +282,7 @@ mod tests {
         let version = "0.1";
         let cmd = "cmd.exe";
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, None);
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         let bindir = fixture.tool_dir.child("bin");
         bindir.create_dir_all().unwrap();
         let exe = bindir.child(&cmd);
@@ -306,7 +306,7 @@ mod tests {
             |"#
         .strip_margin();
         let tmpdir = TempDir::new().unwrap();
-        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, Some(&yml));
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, Some(&yml));
         let bindir = fixture.tool_dir.child("bin");
         bindir.create_dir_all().unwrap();
         let exe = bindir.child(&cmd);
