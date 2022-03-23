@@ -103,7 +103,7 @@ fn run(app: Cli, env: &RuntimeEnvironment) -> Result<()> {
 fn reshim(env: &RuntimeEnvironment, cleanup: bool) -> Result<()> {
     info!("Create shims requested");
     let pm = PluginManager::new(&env.plugins_dir);
-    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe, pm)?;
+    let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe, &pm)?;
     let db = shims.generate_db_from_installed_tools()?;
     shims.save_db(&db)?;
     shims.create_shims(cleanup)?;

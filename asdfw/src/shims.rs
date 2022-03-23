@@ -3,7 +3,7 @@ use log::{debug, info};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::plugins::plugin_manager::PluginManager;
 
@@ -17,7 +17,7 @@ pub struct Shims<'a> {
     tools_install_dir: &'a Path,
     shims_dir: &'a Path,
     shim_exe: &'a Path,
-    plugin_manager: PluginManager<'a>,
+    plugin_manager: &'a PluginManager<'a>,
 }
 
 impl<'a> Shims<'a> {
@@ -28,7 +28,7 @@ impl<'a> Shims<'a> {
         tools_install_dir: &'a Path,
         shims_dir: &'a Path,
         shim_exe: &'a Path,
-        plugin_manager: PluginManager<'a>,
+        plugin_manager: &'a PluginManager<'a>,
     ) -> Result<Self> {
         if !tools_install_dir.is_dir() {
             return Err(anyhow!(
@@ -58,26 +58,6 @@ impl<'a> Shims<'a> {
         Ok(())
     }
 
-    /// Returns the full path to the shimmed executable.
-    pub fn get_full_executable_path(&self, exe: &str, tool: &str, version: &str) -> Result<Option<PathBuf>> {
-        let mut base_path = self.tools_install_dir.join(&tool);
-        base_path.push(&version);
-        let plugin = &self
-            .plugin_manager
-            .get_plugin(tool)
-            .with_context(|| format!("getting plugin for {tool}"))?;
-        let bindirs = &plugin.config.bin_dirs;
-        for dir in bindirs {
-            let mut path = base_path.clone();
-            path.push(&dir);
-            path.push(exe);
-            if path.exists() {
-                return Ok(Some(path));
-            }
-        }
-        Ok(None)
-    }
-
     /// Resolve executable name as shim even if entered without extension.
     pub fn resolve_command(&self, exe: &str) -> Result<Option<String>> {
         for entry in fs::read_dir(&self.shims_dir)? {
@@ -95,12 +75,11 @@ impl<'a> Shims<'a> {
                 }
             }
         }
-        // Fix: test!
         Ok(None)
     }
 
     /// Find a plugin which owns this exe
-    pub fn find_plugin(&self, exe: &str) -> Result<Option<String>> {
+    pub fn find_tool(&self, exe: &str) -> Result<Option<String>> {
         let shims = self.load_db()?;
         Ok(shims.get(exe).map(|s| s.to_string()))
     }
@@ -179,7 +158,7 @@ mod tests {
     use super::*;
     use assert_fs::{fixture::ChildPath, prelude::*, TempDir};
     use rstest::rstest;
-    use std::{fs::OpenOptions, str::FromStr};
+    use std::fs::OpenOptions;
 
     struct TestPaths {
         tools_install_dir: ChildPath,
@@ -248,7 +227,7 @@ mod tests {
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
         #[rustfmt::skip]
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
         let loaded = shims.load_db().unwrap();
         assert_eq!(db, loaded);
@@ -269,7 +248,7 @@ mod tests {
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
         #[rustfmt::skip]
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         for n in existing_shims {
             paths.shims_dir.child(&n).touch().unwrap();
         }
@@ -278,28 +257,28 @@ mod tests {
     }
 
     #[test]
-    fn find_plugin_with_existing_plugin_returns_valid_plugin() {
+    fn find_tool_existing_tool_returns_valid_tool() {
         let db = test_data();
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
         #[rustfmt::skip]
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
-        let result = shims.find_plugin("kubens.exe").unwrap();
+        let result = shims.find_tool("kubens.exe").unwrap();
         assert_eq!(result, Some("kubectx".to_string()));
     }
 
     #[test]
-    fn find_plugin_with_invalid_plugin_returns_none() {
+    fn find_tool_with_invalid_tool_returns_none() {
         let db = test_data();
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
         #[rustfmt::skip]
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
-        let result = shims.find_plugin("mycmd").unwrap();
+        let result = shims.find_tool("mycmd").unwrap();
         assert_eq!(result, None);
     }
 
@@ -309,7 +288,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
         paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").child("kubectl.exe").touch().unwrap();
         paths.tools_install_dir.child("kubectl").child("1.1").child("bin").create_dir_all().unwrap();
@@ -335,7 +314,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
         paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").child("kubectl.exe").touch().unwrap();
         paths.tools_install_dir.child("kubectl").child("1.1").child("bin").create_dir_all().unwrap();
@@ -351,7 +330,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
         // !! The executable created below should trigger an error:
         paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").child("kubens.exe").touch().unwrap();
@@ -367,88 +346,13 @@ mod tests {
     }
 
     #[test]
-    fn test_get_full_executable_path_when_version_does_not_exist_returns_none() {
-        let tmp_dir = TempDir::new().unwrap();
-        let paths = test_paths(&tmp_dir);
-        let pm = PluginManager::new(&paths.plugins_dir);
-        #[rustfmt::skip]
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
-        let tool = "mytool";
-        let exe = "myexe";
-        let version = "v1.0.1";
-        let result = shims.get_full_executable_path(exe, tool, version);
-        assert_eq!(result.unwrap(), None);
-    }
-
-    #[test]
-    #[rustfmt::skip]
-    fn test_get_full_executable_path_when_version_exists_returns_path() {
-        let tmp_dir = TempDir::new().unwrap();
-        let paths = test_paths(&tmp_dir);
-        let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
-        let tool = "mytool";
-        let exe = "myexe";
-        let version = "v1.0.1";
-        let binary = paths.tools_install_dir.child(&tool).child(&version).child("bin").child(&exe);
-        binary.touch().unwrap();
-        let path = binary.to_str().unwrap();
-        let result = shims.get_full_executable_path(exe, tool, version);
-        assert_eq!(result.unwrap(), Some(PathBuf::from_str(path).unwrap()));
-    }
-
-    #[test]
-    fn get_full_executable_path_with_non_default_path_should_work() {
-        let tmpdir = TempDir::new().unwrap();
-        let paths = custom_bin_dirs_fixture(&tmpdir);
-        let pm = PluginManager::new(&paths.plugins_dir);
-        let shims =
-            Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
-        let db = shims.generate_db_from_installed_tools().unwrap();
-        shims.save_db(&db).unwrap();
-        let result = shims.get_full_executable_path("tool-bin1.exe", "mytool", "1.0").unwrap();
-        assert!(result.is_some(), "should have received valid path, got None!");
-        let result = result.unwrap();
-        let result_path = result.to_str().unwrap();
-        let expected = r"mytool\1.0\bin1\tool-bin1.exe";
-        assert!(
-            result_path.ends_with(&expected),
-            "'{}' does not end with '{}'",
-            result_path,
-            expected
-        );
-    }
-
-    #[test]
-    fn get_full_executable_path_with_nultiple_paths_should_loop_through_path() {
-        let tmpdir = TempDir::new().unwrap();
-        let paths = custom_bin_dirs_fixture(&tmpdir);
-        let pm = PluginManager::new(&paths.plugins_dir);
-        let shims =
-            Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
-        let db = shims.generate_db_from_installed_tools().unwrap();
-        shims.save_db(&db).unwrap();
-        let result = shims.get_full_executable_path("tool-bin2.exe", "mytool", "1.0").unwrap();
-        assert!(result.is_some(), "should have received valid path, got None!");
-        let result = result.unwrap();
-        let result_path = result.to_str().unwrap();
-        let expected = r"mytool\1.0\some\bin2\tool-bin2.exe";
-        assert!(
-            result_path.ends_with(&expected),
-            "'{}' does not end with '{}'",
-            result_path,
-            expected
-        );
-    }
-
-    #[test]
     #[rustfmt::skip]
     fn create_shims_without_cleanup_should_create_shims_that_exists_in_the_db() {
         let db = test_data();
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
         shims.create_shims(false).unwrap();
         db.keys().for_each(|k| {
@@ -464,7 +368,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         let dangling = shims.shims_dir.join("invalid.exe");
         OpenOptions::new().create(true).write(true).open(&dangling).unwrap();
         shims.save_db(&db).unwrap();
@@ -480,7 +384,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let paths = test_paths(&tmp_dir);
         let pm = PluginManager::new(&paths.plugins_dir);
-        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         let dangling = shims.shims_dir.join("invalid.exe");
         OpenOptions::new().create(true).write(true).open(&dangling).unwrap();
         shims.save_db(&db).unwrap();
@@ -495,7 +399,7 @@ mod tests {
         let paths = custom_bin_dirs_fixture(&tmpdir);
         let pm = PluginManager::new(&paths.plugins_dir);
         let shims =
-            Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, pm).unwrap();
+            Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         let db = shims.generate_db_from_installed_tools().unwrap();
         assert!(db.contains_key("tool-bin1.exe"), "should contain executables from bin1 dir");
         assert!(db.contains_key("tool-bin2.exe"), "should contain executables from bin2 dir");

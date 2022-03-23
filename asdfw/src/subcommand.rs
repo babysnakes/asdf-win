@@ -1,15 +1,5 @@
 use anyhow::{Context, Result};
-use std::{ffi::OsStr, path::Path, process::Command};
-
-pub fn mk_command<I, S>(cmd: &Path, args: I) -> Command
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let mut command = Command::new(&cmd);
-    command.args(args);
-    command
-}
+use std::process::Command;
 
 /// A sort of `exec` implementation. Windows does not really have `exec` so we
 /// are wrapping the executable to run and returning it's exit code (passing all
