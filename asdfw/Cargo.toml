@@ -25,3 +25,4 @@ winapi = { version = "0.3.9", features = ["consoleapi", "minwindef"] }
 assert_fs = "1.0"
 rstest = "0.12"
 stripmargin = "0.1"
+temp-env = "0.2"

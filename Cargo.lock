@@ -42,6 +42,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "stripmargin",
+ "temp-env",
  "textwrap",
  "winapi",
  "yansi",
@@ -621,6 +622,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "temp-env"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45107136c2ddf8c4b87453c02294fd0adf41751796e81e8ba3f7fd951977ab57"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]

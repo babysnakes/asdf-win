@@ -24,10 +24,10 @@ pub struct PluginConfig {
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde()]
 pub struct EnvVar {
-    name: String,
-    value: EnvVarValue,
+    pub name: String,
+    pub value: EnvVarValue,
     #[serde(default)]
-    overriding_name: Option<String>,
+    pub overriding_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

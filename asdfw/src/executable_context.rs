@@ -1,12 +1,12 @@
 use std::{
-    ffi::OsStr,
+    env::var_os,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     process::Command,
 };
 
+use crate::plugins::plugin::{EnvVar, EnvVarValue, Plugin};
 use log::debug;
-
-use crate::plugins::plugin::Plugin;
 
 #[derive(Debug)]
 pub struct ExecutableContext<'a> {
@@ -54,10 +54,35 @@ impl<'a> ExecutableContext<'a> {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
+        let envs = self.env_vars_to_envs(&self.plugin.config.env_vars);
         let cmd = self.get_full_executable_path()?;
         let mut command = Command::new(&cmd);
-        command.args(args);
+        command.args(args).envs(envs);
         Some(command)
+    }
+
+    fn env_vars_to_envs(&self, env_vars: &[EnvVar]) -> Vec<(OsString, OsString)> {
+        env_vars.iter().map(|ev| self.parse_env_var(ev)).collect()
+    }
+
+    fn parse_env_var(&self, envvar: &EnvVar) -> (OsString, OsString) {
+        let parse_value = |value: &EnvVarValue| match value {
+            EnvVarValue::Value { value } => OsString::from(value),
+            EnvVarValue::RelativeInstallPath { relative_inst_path } => {
+                let path = self.tool_install_root.join(relative_inst_path);
+                path.as_os_str().to_owned()
+            }
+        };
+
+        let value = match &envvar.overriding_name {
+            None => parse_value(&envvar.value),
+            Some(var_name) => match var_os(var_name) {
+                Some(value) => value,
+                None => parse_value(&envvar.value),
+            },
+        };
+
+        (OsString::from(&envvar.name), value)
     }
 }
 
@@ -266,5 +291,121 @@ mod tests {
         let command = fixture.ec.mk_command(&args).unwrap();
         let mut result = command.get_args();
         assert!(result.next().is_none(), "expected empty args, got {:?}", result);
+    }
+
+    #[test]
+    fn mk_command_sets_environment_variables_if_requested() {
+        let tool = "mytool";
+        let version = "0.1";
+        let cmd = "cmd.exe";
+        let yml = r#"---
+            |env_vars:
+            |  - name: MYENV
+            |    value:
+            |      value: "A Value"
+            |"#
+        .strip_margin();
+        let tmpdir = TempDir::new().unwrap();
+        let fixture = fixture_executable_context(&tmpdir, &cmd, &tool, &version, Some(&yml));
+        let bindir = fixture.tool_dir.child("bin");
+        bindir.create_dir_all().unwrap();
+        let exe = bindir.child(&cmd);
+        exe.touch().unwrap();
+        let args: Vec<&str> = vec![];
+        let command = fixture.ec.mk_command(&args).unwrap();
+        let mut envs = command.get_envs();
+        let expected = (OsStr::new("MYENV"), Some(OsStr::new("A Value")));
+        let first_env = envs.next().unwrap();
+        assert_eq!(first_env, expected);
+    }
+
+    #[test]
+    fn parse_env_var_returns_provided_simple_values() {
+        let tmpdir = TempDir::new().unwrap();
+        let ecf = fixture_executable_context(&tmpdir, "cmd.exe", "tool", "0.1", None);
+        let ev = EnvVar {
+            name: "MY_VAR".to_string(),
+            overriding_name: None,
+            value: EnvVarValue::Value {
+                value: "A Value".to_string(),
+            },
+        };
+        let env = ecf.ec.parse_env_var(&ev);
+        assert_eq!(env.0, OsString::from("MY_VAR"));
+        assert_eq!(env.1, OsString::from("A Value"));
+    }
+
+    #[test]
+    fn parse_env_var_parses_relative_paths_correctly() {
+        let relative_path = r"some\path";
+        let tmpdir = TempDir::new().unwrap();
+        let ecf = fixture_executable_context(&tmpdir, "cmd.exe", "tool", "0.1", None);
+        let ev = EnvVar {
+            name: "MY_VAR".to_string(),
+            overriding_name: None,
+            value: EnvVarValue::RelativeInstallPath {
+                relative_inst_path: relative_path.to_string(),
+            },
+        };
+        let env = ecf.ec.parse_env_var(&ev);
+        assert_eq!(env.0, OsString::from("MY_VAR"));
+        let path = env.1.to_str().unwrap();
+        assert!(
+            path.ends_with(&relative_path),
+            "Expected relative path to end with provided value, got: '{path}'"
+        );
+        let prefix = ecf.tool_dir.to_str().unwrap();
+        assert!(
+            path.starts_with(prefix),
+            "Expected relative path to stat with install dir, got: '{path}'"
+        );
+    }
+
+    #[test]
+    fn parse_env_var_parses_overrides_correctly() {
+        let tmpdir = TempDir::new().unwrap();
+        let ecf = fixture_executable_context(&tmpdir, "cmd.exe", "tool", "0.1", None);
+        let overriding_var_name = "OVERRIDING_MY_VAR";
+        let overriding_value = "Overriding Value";
+        let ev = EnvVar {
+            name: "MY_VAR".to_string(),
+            overriding_name: Some(overriding_var_name.to_string()),
+            value: EnvVarValue::Value {
+                value: "A Value".to_string(),
+            },
+        };
+        temp_env::with_var(overriding_var_name, Some(overriding_value), || {
+            let env = ecf.ec.parse_env_var(&ev);
+            assert_eq!(env.0, OsString::from("MY_VAR"));
+            assert_eq!(env.1, OsString::from(overriding_value));
+        });
+    }
+
+    #[test]
+    fn env_vars_to_envs_works_correctly() {
+        let tmpdir = TempDir::new().unwrap();
+        let ecf = fixture_executable_context(&tmpdir, "cmd.exe", "tool", "0.1", None);
+        let evs = vec![
+            EnvVar {
+                name: "MY_VAR".to_string(),
+                overriding_name: None,
+                value: EnvVarValue::Value {
+                    value: "A Value".to_string(),
+                },
+            },
+            EnvVar {
+                name: "MY_VAR2".to_string(),
+                overriding_name: Some("NOSUCHVAR".to_string()),
+                value: EnvVarValue::Value {
+                    value: "A Value2".to_string(),
+                },
+            },
+        ];
+        let result = ecf.ec.env_vars_to_envs(&evs);
+        let expected = vec![
+            (OsString::from("MY_VAR"), OsString::from("A Value")),
+            (OsString::from("MY_VAR2"), OsString::from("A Value2")),
+        ];
+        assert_eq!(result, expected);
     }
 }
