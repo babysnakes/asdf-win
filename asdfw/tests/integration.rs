@@ -37,6 +37,22 @@ fn which_with_no_version_configured_should_return_error_no_version() {
     assert!(msg.contains("No version"), "wrong error message for no configured version: {}", &msg);
 }
 
+#[test]
+fn which_with_invalid_command_should_return_matching_error() {
+    let cmd_name = "nosuchshim";
+    let versions = "mytool1 1.2.4";
+    let tmp_dir = TempDir::new().unwrap();
+    let paths = Paths::new(&tmp_dir, versions, None);
+    let env = paths.to_environment();
+    common::fixture_installed_tools(&paths.installs_dir);
+    let db = paths.generate_shims_db();
+    common::test_data_matching_shims(&paths.shims_dir, &db);
+    let err = find_path_for_cmd(&env,cmd_name).unwrap_err();
+    let msg = format!("{err}");
+    assert!(msg.contains("Could not find shim"), "should explain that shim does not exist, got: '{msg}'");
+    assert!(msg.contains(cmd_name), "should repeat shim name. got: '{msg}'");
+}
+
 #[rstest]
 #[case("mytool5", "1.0", "mycmd.exe", "mycmd.exe", "searching with full name")]
 #[case("mytool5", "1.0", "mycmd", "mycmd.exe", "missing '.exe' extension")]

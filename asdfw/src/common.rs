@@ -48,7 +48,10 @@ where
     let pm = PluginManager::new(&env.plugins_dir);
     let shims = Shims::new(&env.shims_db, &env.installs_dir, &env.shims_dir, &env.shim_exe, &pm)?;
     let context = format!("resolving command ({})", &cmd);
-    let cmd_name = shims.resolve_command(cmd).context(context)?.unwrap_or_else(|| cmd.to_string());
+    let cmd_name = shims
+        .resolve_command(cmd)
+        .context(context)?
+        .ok_or_else(|| anyhow!("Could not find shim named: '{cmd}'"))?;
     debug!("Command '{}' resolved to: '{}'", &cmd, &cmd_name);
     let tool = shims
         .find_tool(&cmd_name)?
