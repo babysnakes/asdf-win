@@ -14,6 +14,8 @@ fn which_with_no_tool_exists_should_return_error_no_tool() {
     common::fixture_installed_tools(&paths.installs_dir);
     let db = paths.generate_shims_db();
     common::test_data_matching_shims(&paths.shims_dir, &db);
+    let shim = paths.shims_dir.child("no-cmd.exe");
+    shim.touch().unwrap(); // make sure it exists as a shim - otherwise this is different error
     let err = find_path_for_cmd(&env, "no-cmd.exe").unwrap_err();
     let msg = format!("{}", err);
     assert!(
@@ -47,9 +49,12 @@ fn which_with_invalid_command_should_return_matching_error() {
     common::fixture_installed_tools(&paths.installs_dir);
     let db = paths.generate_shims_db();
     common::test_data_matching_shims(&paths.shims_dir, &db);
-    let err = find_path_for_cmd(&env,cmd_name).unwrap_err();
+    let err = find_path_for_cmd(&env, cmd_name).unwrap_err();
     let msg = format!("{err}");
-    assert!(msg.contains("Could not find shim"), "should explain that shim does not exist, got: '{msg}'");
+    assert!(
+        msg.contains("Could not find shim"),
+        "should explain that shim does not exist, got: '{msg}'"
+    );
     assert!(msg.contains(cmd_name), "should repeat shim name. got: '{msg}'");
 }
 

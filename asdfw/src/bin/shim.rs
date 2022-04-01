@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use asdfw::common::execute_command;
+use asdfw::common::{execute_command, Cmd};
 use asdfw::runtime::RuntimeEnvironment;
 use flexi_logger::*;
 use std::{env, process};
@@ -17,13 +17,14 @@ fn main() -> Result<()> {
 
 fn run() -> Result<i32> {
     let me = env::current_exe()?;
+    // Todo: Convert to OsString?
     let exe_name = me.file_name().unwrap().to_str().unwrap();
     let args = env::args().skip(1);
     let runtime = RuntimeEnvironment::new()?;
     if env::var(DEBUG_VARIABLE).is_ok() {
         configure_log(&runtime)?;
     };
-    execute_command(&runtime, exe_name, args)
+    execute_command(&runtime, &Cmd::UnResolved(exe_name), args)
 }
 
 fn configure_log(runtime: &RuntimeEnvironment) -> Result<LoggerHandle> {
