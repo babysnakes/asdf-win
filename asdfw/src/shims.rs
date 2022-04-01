@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
 use std::collections::HashMap;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::Path;
 
@@ -59,18 +59,16 @@ impl<'a> Shims<'a> {
     }
 
     /// Resolve executable name as shim even if entered without extension.
-    pub fn resolve_command(&self, exe: &str) -> Result<Option<String>> {
+    pub fn resolve_command(&self, exe: &OsStr) -> Result<Option<OsString>> {
         for entry in fs::read_dir(&self.shims_dir)? {
-            let name = entry?
-                .file_name()
-                .into_string()
-                .map_err(|e| anyhow!("could not convert {:?} to string", e))?;
+            let name = entry?.file_name();
             if exe == name {
                 return Ok(Some(name));
             }
+            let path = Path::new(exe);
             for ext in EXTENSIONS.iter() {
-                let with_ext = format!("{}.{}", exe, ext);
-                if with_ext == name {
+                let with_ext = path.with_extension(ext);
+                if with_ext.as_os_str() == &name {
                     return Ok(Some(name));
                 }
             }
@@ -79,9 +77,10 @@ impl<'a> Shims<'a> {
     }
 
     /// Find a plugin which owns this exe
-    pub fn find_tool(&self, exe: &str) -> Result<Option<String>> {
+    pub fn find_tool(&self, exe: &OsStr) -> Result<Option<String>> {
         let shims = self.load_db()?;
-        Ok(shims.get(exe).map(|s| s.to_string()))
+        let exe_name = exe.to_str().unwrap(); // Fix: unwrap
+        Ok(shims.get(exe_name).map(|s| s.to_string()))
     }
 
     /// Generates all required shims. Cleans up the shims directory before if desired.
@@ -235,13 +234,13 @@ mod tests {
 
     #[rustfmt::skip]
     #[rstest]
-    #[case(vec!["hello.exe", "world.exe"], "hello.exe", Some("hello.exe".to_string()), "exact match")]
-    #[case(vec!["hello.exe", "world.exe"], "hello", Some("hello.exe".to_string()), "missing extension")]
-    #[case(vec!["hello.exe", "world.exe"], "what.exe", None, "invalid command")]
+    #[case(vec!["hello.exe", "world.exe"], OsStr::new("hello.exe"), Some(OsString::from("hello.exe")), "exact match")]
+    #[case(vec!["hello.exe", "world.exe"], OsStr::new("hello"), Some(OsString::from("hello.exe")), "missing extension")]
+    #[case(vec!["hello.exe", "world.exe"], OsStr::new("what.exe"), None, "invalid command")]
     fn resolve_command_tests(
         #[case] existing_shims: Vec<&str>,
-        #[case] exe: &str,
-        #[case] expected: Option<String>,
+        #[case] exe: &OsStr,
+        #[case] expected: Option<OsString>,
         #[case] msg: &str,
     ) {
         let tmp_dir = TempDir::new().unwrap();
@@ -265,8 +264,8 @@ mod tests {
         #[rustfmt::skip]
         let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
-        let result = shims.find_tool("kubens.exe").unwrap();
-        assert_eq!(result, Some("kubectx".to_string()));
+        let result = shims.find_tool(OsStr::new("kubens.exe")).unwrap();
+        assert_eq!(result, Some("kubectx".to_owned()));
     }
 
     #[test]
@@ -278,7 +277,7 @@ mod tests {
         #[rustfmt::skip]
         let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
-        let result = shims.find_tool("mycmd").unwrap();
+        let result = shims.find_tool(OsStr::new("mycmd")).unwrap();
         assert_eq!(result, None);
     }
 

@@ -18,7 +18,7 @@ fn main() -> Result<()> {
 fn run() -> Result<i32> {
     let me = env::current_exe()?;
     // Todo: Convert to OsString?
-    let exe_name = me.file_name().unwrap().to_str().unwrap();
+    let exe_name = me.file_name().unwrap();
     let args = env::args().skip(1);
     let runtime = RuntimeEnvironment::new()?;
     if env::var(DEBUG_VARIABLE).is_ok() {
