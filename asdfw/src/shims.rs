@@ -9,7 +9,7 @@ use crate::plugins::plugin_manager::PluginManager;
 
 const EXTENSIONS: &[&str] = &["exe"];
 
-pub type ShimsDB = HashMap<String, String>;
+pub type ShimsDB = HashMap<OsString, OsString>;
 
 /// The Shims struct contains data required for handling shims.
 pub struct Shims<'a> {
@@ -77,10 +77,9 @@ impl<'a> Shims<'a> {
     }
 
     /// Find a plugin which owns this exe
-    pub fn find_tool(&self, exe: &OsStr) -> Result<Option<String>> {
+    pub fn find_tool(&self, exe: &OsStr) -> Result<Option<OsString>> {
         let shims = self.load_db()?;
-        let exe_name = exe.to_str().unwrap(); // Fix: unwrap
-        Ok(shims.get(exe_name).map(|s| s.to_string()))
+        Ok(shims.get(exe).map(|s| s.to_owned()))
     }
 
     /// Generates all required shims. Cleans up the shims directory before if desired.
@@ -93,8 +92,8 @@ impl<'a> Shims<'a> {
         let db = self.load_db()?;
         for exe in db.keys() {
             let target = self.shims_dir.join(&exe);
-            debug!("Creating shim for {}", &exe);
-            fs::copy(&self.shim_exe, target).context(format!("creating shim for {}", &exe))?;
+            debug!("Creating shim for {:?}", &exe);
+            fs::copy(&self.shim_exe, target).context(format!("creating shim for {:?}", &exe))?;
         }
         Ok(())
     }
@@ -104,26 +103,26 @@ impl<'a> Shims<'a> {
 
         for entry in fs::read_dir(self.tools_install_dir)? {
             let entry = entry?;
-            let tool = entry.file_name().into_string().unwrap(); // Can we trust NTFS to always have unicode filenames?
+            let tool = entry.file_name();
             for version in fs::read_dir(entry.path())? {
                 let version = version?;
                 if version.path().is_dir() {
                     let plugin = &self
                         .plugin_manager
-                        .get_plugin(&tool)
-                        .with_context(|| format!("loading plugin for {}", &tool))?;
+                        .get_plugin(&tool.to_str().unwrap()) // FIX: tunwrap
+                        .with_context(|| format!("loading plugin for {:?}", &tool))?;
                     for bin_dir in &plugin.config.bin_dirs {
                         let mut path = version.path();
                         path.push(bin_dir);
                         for exe in fs::read_dir(path)? {
                             let exe = exe?;
                             if valid_exe_extension(exe.path().extension()) {
-                                let exe_name = exe.file_name().into_string().unwrap();
+                                let exe_name = exe.file_name();
                                 let old_value = db.insert(exe_name.clone(), tool.clone());
                                 if let Some(value) = old_value {
                                     if value != tool {
                                         return Err(anyhow!(
-                                            "{} appears in two tools: {} and {}",
+                                            "{:?} appears in two tools: {:?} and {:?}",
                                             &exe_name,
                                             &tool,
                                             &value
@@ -187,11 +186,11 @@ mod tests {
 
     fn test_data() -> ShimsDB {
         HashMap::from([
-            ("kubectl.exe".to_string(), "kubectl".to_string()),
-            ("docker.exe".to_string(), "docker".to_string()),
-            ("minikube.exe".to_string(), "minikube".to_string()),
-            ("kubectx.exe".to_string(), "kubectx".to_string()),
-            ("kubens.exe".to_string(), "kubectx".to_string()),
+            (OsString::from("kubectl.exe"), OsString::from("kubectl")),
+            (OsString::from("docker.exe"), OsString::from("docker")),
+            (OsString::from("minikube.exe"), OsString::from("minikube")),
+            (OsString::from("kubectx.exe"), OsString::from("kubectx")),
+            (OsString::from("kubens.exe"), OsString::from("kubectx")),
         ])
     }
 
@@ -265,7 +264,7 @@ mod tests {
         let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         shims.save_db(&db).unwrap();
         let result = shims.find_tool(OsStr::new("kubens.exe")).unwrap();
-        assert_eq!(result, Some("kubectx".to_owned()));
+        assert_eq!(result, Some(OsString::from("kubectx")));
     }
 
     #[test]
@@ -320,7 +319,7 @@ mod tests {
         paths.tools_install_dir.child("kubectl").child("1.1").child("bin").child("kubectl.exe").touch().unwrap();
         paths.tools_install_dir.child("kubectl").child("1.1").child("bin").child("kubectl.txt").touch().unwrap();
         let generated = shims.generate_db_from_installed_tools().unwrap();
-        assert!(!generated.contains_key("kubectl.txt"), "should not contain files with wrong extension");
+        assert!(!generated.contains_key(OsStr::new("kubectl.txt")), "should not contain files with wrong extension");
     }
 
     #[test]
@@ -355,7 +354,7 @@ mod tests {
         shims.save_db(&db).unwrap();
         shims.create_shims(false).unwrap();
         db.keys().for_each(|k| {
-            assert!(shims.shims_dir.join(k).exists(), "shim '{}' does not exist", &k);
+            assert!(shims.shims_dir.join(k).exists(), "shim '{:?}' does not exist", &k);
         });
         assert_eq!(shims.shims_dir.read_dir().unwrap().count(), 5);
     }
@@ -400,7 +399,13 @@ mod tests {
         let shims =
             Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
         let db = shims.generate_db_from_installed_tools().unwrap();
-        assert!(db.contains_key("tool-bin1.exe"), "should contain executables from bin1 dir");
-        assert!(db.contains_key("tool-bin2.exe"), "should contain executables from bin2 dir");
+        assert!(
+            db.contains_key(OsStr::new("tool-bin1.exe")),
+            "should contain executables from bin1 dir"
+        );
+        assert!(
+            db.contains_key(OsStr::new("tool-bin2.exe")),
+            "should contain executables from bin2 dir"
+        );
     }
 }

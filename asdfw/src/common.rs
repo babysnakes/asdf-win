@@ -51,7 +51,7 @@ where
 pub fn run_with_executable_context<F, T>(
     env: &RuntimeEnvironment,
     cmd: &Cmd,
-    tool: Option<String>,
+    tool: Option<&OsStr>,
     func: F,
 ) -> Result<T>
 where
@@ -72,15 +72,17 @@ where
         }
     };
     let tool = match tool {
-        Some(tool) => tool,
+        Some(tool) => tool.to_owned(),
         None => shims
             .find_tool(&cmd_name)?
             .ok_or_else(|| anyhow!("No tool configured for the command: {:?}", &cmd_name))?,
     };
-    let plugin = pm.get_plugin(&tool).with_context(|| format!("Getting plugin for {tool}"))?;
-    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool);
-    let version = tvs.get_version()?.ok_or_else(|| anyhow!("No version configured for {}", &tool))?;
+    let plugin = pm
+        .get_plugin(&tool.to_str().unwrap())
+        .with_context(|| format!("Getting plugin for {:?}", tool))?; // Fix: unwrap
+    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool.to_str().unwrap()); // fix: unwrap
+    let version = tvs.get_version()?.ok_or_else(|| anyhow!("No version configured for {:?}", &tool))?;
     let ec = ExecutableContext::new(&cmd_name.to_str().unwrap(), plugin, &version, &env.installs_dir) // Fix: unwrap
-        .ok_or_else(|| anyhow!("Version '{version}' of '{tool}' is configured but not installed"))?;
+        .ok_or_else(|| anyhow!("Version '{version}' of '{:?}' is configured but not installed", tool))?;
     func(ec)
 }
