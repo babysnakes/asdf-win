@@ -68,7 +68,7 @@ impl<'a> Shims<'a> {
             let path = Path::new(exe);
             for ext in EXTENSIONS.iter() {
                 let with_ext = path.with_extension(ext);
-                if with_ext.as_os_str() == &name {
+                if with_ext.as_os_str() == name {
                     return Ok(Some(name));
                 }
             }

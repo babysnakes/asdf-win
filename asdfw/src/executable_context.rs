@@ -10,14 +10,14 @@ use log::debug;
 
 #[derive(Debug)]
 pub struct ExecutableContext<'a> {
-    pub cmd_name: &'a str,
+    pub cmd_name: &'a OsStr,
     pub plugin: Plugin<'a>,
-    pub version: &'a str,
+    pub version: &'a OsStr,
     tool_install_root: PathBuf,
 }
 
 impl<'a> ExecutableContext<'a> {
-    pub fn new(cmd_name: &'a str, plugin: Plugin<'a>, version: &'a str, tools_install_dir: &Path) -> Option<Self> {
+    pub fn new(cmd_name: &'a OsStr, plugin: Plugin<'a>, version: &'a OsStr, tools_install_dir: &Path) -> Option<Self> {
         let tool_install_root: PathBuf =
             [tools_install_dir, Path::new(plugin.name), Path::new(version)].iter().collect();
         if tool_install_root.exists() {
@@ -35,7 +35,7 @@ impl<'a> ExecutableContext<'a> {
     /// Extracts the full executable path from `self.cmd_name`. Return `None`
     /// if a command by that name is not found in the current version.
     pub fn get_full_executable_path(&self) -> Option<PathBuf> {
-        debug!("Searching for full executable path for shim: {}", self.cmd_name);
+        debug!("Searching for full executable path for shim: {:?}", self.cmd_name);
         for dir in &self.plugin.config.bin_dirs {
             let assumed: PathBuf =
                 [&self.tool_install_root, Path::new(&dir), Path::new(self.cmd_name)].iter().collect();
@@ -122,6 +122,8 @@ mod tests {
         version: &'a str,
         plugin_yml: Option<&str>,
     ) -> ExecutableContextFuxture<'a> {
+        let cmd = OsStr::new(cmd);
+        let version = OsStr::new(version);
         let tool = OsStr::new(tool);
         let paths = required_dirs(root, tool);
         let tool_dir = paths.installs_dir.child(&tool).child(&version);
@@ -138,24 +140,26 @@ mod tests {
     #[test]
     fn new_computes_tool_install_root_correctly() {
         let tool = OsStr::new("mytool");
-        let version = "0.1";
+        let version = OsStr::new("0.1");
         let tmpdir = TempDir::new().unwrap();
         let paths = required_dirs(&tmpdir, tool);
         let tool_dir = paths.installs_dir.child(&tool).child(&version);
         tool_dir.create_dir_all().unwrap();
         let plugin = Plugin::new(tool, paths.plugin_dir.to_path_buf()).unwrap();
-        let result = ExecutableContext::new("cmd.exe", plugin, version, &paths.installs_dir).unwrap();
+        let cmd_name = OsStr::new("cmd.exe");
+        let result = ExecutableContext::new(cmd_name, plugin, version, &paths.installs_dir).unwrap();
         assert_eq!(result.tool_install_root, tool_dir.to_path_buf());
     }
 
     #[test]
     fn new_returns_error_if_tool_directory_does_not_exist() {
         let tool = OsStr::new("mytool");
-        let version = "0.1";
+        let version = OsStr::new("0.1");
         let tmpdir = TempDir::new().unwrap();
         let paths = required_dirs(&tmpdir, tool);
         let plugin = Plugin::new(tool, paths.plugin_dir.to_path_buf()).unwrap();
-        let result = ExecutableContext::new("cmd.exe", plugin, version, &paths.installs_dir);
+        let cmd_name = OsStr::new("cmd.exe");
+        let result = ExecutableContext::new(cmd_name, plugin, version, &paths.installs_dir);
         assert!(result.is_none(), "should return none if install root does not exist");
     }
 

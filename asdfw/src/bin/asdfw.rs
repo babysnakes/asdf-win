@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use asdfw::common::*;
 use asdfw::plugins::plugin_manager::PluginManager;
 use asdfw::runtime::RuntimeEnvironment;
@@ -139,7 +139,10 @@ fn set_local<'a>(env: &RuntimeEnvironment, tool: &'a str, version: &'a str) -> R
 fn which(env: &RuntimeEnvironment, cmd: &str) -> Result<()> {
     info!("invoked `which` on {}", &cmd);
     let path = find_path_for_cmd(env, cmd)?;
-    print_out(vec![path]);
+    let path_name = path
+        .to_str()
+        .ok_or_else(|| anyhow!("Could not convert tool name {:?} to UTF-8. Are you using non UTF-8 charset?", &path))?;
+    print_out(vec![path_name]);
     Ok(())
 }
 

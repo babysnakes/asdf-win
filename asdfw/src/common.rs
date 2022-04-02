@@ -15,19 +15,13 @@ pub enum Cmd<'a> {
     UnResolved(&'a OsStr),
 }
 
-// Todo: return someting else,not string.
-pub fn find_path_for_cmd(env: &RuntimeEnvironment, cmd: &str) -> Result<String> {
+pub fn find_path_for_cmd(env: &RuntimeEnvironment, cmd: &str) -> Result<OsString> {
     let func = |ec: ExecutableContext| match ec.get_full_executable_path() {
-        Some(path) => {
-            let path_str = path.to_str().ok_or_else(|| {
-                anyhow!("Couldn't convert '{:?}' to UTF8 string. Are you using non UTF8 file system?", path)
-            })?;
-            Ok(path_str.to_owned())
-        }
+        Some(path) => Ok(path.into_os_string()),
         None => Err(anyhow!(
-            "{} does not exist in version '{}' of '{:?}'",
+            "{:?} does not exist in version '{}' of '{:?}'",
             &ec.cmd_name,
-            &ec.version,
+            &ec.version.to_string_lossy(),
             &ec.plugin.name
         )),
     };
@@ -42,10 +36,10 @@ where
     let func = |ec: ExecutableContext| {
         let command = ec.mk_command(args).ok_or_else(|| {
             anyhow!(
-                "Command {} does not exist in {:?} version {}",
+                "Command {:?} does not exist in {:?} version {}",
                 ec.cmd_name,
                 ec.plugin.name,
-                ec.version
+                ec.version.to_string_lossy()
             )
         })?;
         exec(command)
@@ -69,7 +63,7 @@ where
         Cmd::UnResolved(name) => {
             let context = format!("resolving command ({:?})", name);
             let resolved = shims
-                .resolve_command(&name)
+                .resolve_command(name)
                 .context(context)?
                 .ok_or_else(|| anyhow!("Could not find shim named: '{:?}'", name))?;
             debug!("Command '{:?}' resolved to: '{:?}'", name, resolved);
@@ -83,9 +77,12 @@ where
             .ok_or_else(|| anyhow!("No tool configured for the command: {:?}", &cmd_name))?,
     };
     let plugin = pm.get_plugin(&tool).with_context(|| format!("Getting plugin for {:?}", tool))?;
-    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool.to_str().unwrap()); // fix: unwrap
+    let tool_name = tool
+        .to_str()
+        .ok_or_else(|| anyhow!("Could not convert tool name {:?} to UTF-8. Are you using non UTF-8 charset?", &tool))?;
+    let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, tool_name);
     let version = tvs.get_version()?.ok_or_else(|| anyhow!("No version configured for {:?}", &tool))?;
-    let ec = ExecutableContext::new(&cmd_name.to_str().unwrap(), plugin, &version, &env.installs_dir) // Fix: unwrap
+    let ec = ExecutableContext::new(&cmd_name, plugin, OsStr::new(&version), &env.installs_dir)
         .ok_or_else(|| anyhow!("Version '{version}' of '{:?}' is configured but not installed", tool))?;
     func(ec)
 }

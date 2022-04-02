@@ -78,7 +78,7 @@ fn which_should_return_valid_executable_path(
     common::fixture_installed_tools(&paths.installs_dir);
     let db = paths.generate_shims_db();
     common::test_data_matching_shims(&paths.shims_dir, &db);
-    let expected = mytool_dir.child(&create_exe).path().to_string_lossy().into_owned();
+    let expected = mytool_dir.child(&create_exe).as_os_str().to_owned();
     let result = find_path_for_cmd(&env, search_exe).unwrap();
     assert_eq!(expected, result, "wrong path from `which`. case: {}", msg);
 }
