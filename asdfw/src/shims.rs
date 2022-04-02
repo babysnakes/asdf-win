@@ -109,7 +109,7 @@ impl<'a> Shims<'a> {
                 if version.path().is_dir() {
                     let plugin = &self
                         .plugin_manager
-                        .get_plugin(&tool.to_str().unwrap()) // FIX: tunwrap
+                        .get_plugin(&tool)
                         .with_context(|| format!("loading plugin for {:?}", &tool))?;
                     for bin_dir in &plugin.config.bin_dirs {
                         let mut path = version.path();

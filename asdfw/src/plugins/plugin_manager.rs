@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::path::Path;
+use std::{ffi::OsStr, path::Path};
 
 use super::plugin::Plugin;
 
@@ -12,7 +12,7 @@ impl<'a> PluginManager<'a> {
         PluginManager { plugins_path }
     }
 
-    pub fn get_plugin(&self, name: &'a str) -> Result<Plugin> {
+    pub fn get_plugin(&self, name: &'a OsStr) -> Result<Plugin> {
         Plugin::new(name, self.plugins_path.join(name))
     }
 }
@@ -24,18 +24,18 @@ mod tests {
 
     #[test]
     fn get_plugin_returns_plugin_with_provided_name() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let plugins_dir = TempDir::new().unwrap().to_path_buf();
         let pm = PluginManager {
             plugins_path: &plugins_dir,
         };
         let result = pm.get_plugin(tool).unwrap();
-        assert_eq!(result.name, tool.to_string());
+        assert_eq!(result.name, tool);
     }
 
     #[test]
     fn get_plugin_returns_plugin_with_directory_matching_the_plugin_name() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let plugins_dir = TempDir::new().unwrap().to_path_buf();
         let pm = PluginManager {
             plugins_path: &plugins_dir,

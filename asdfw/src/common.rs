@@ -25,7 +25,7 @@ pub fn find_path_for_cmd(env: &RuntimeEnvironment, cmd: &str) -> Result<String> 
             Ok(path_str.to_owned())
         }
         None => Err(anyhow!(
-            "{} does not exist in version '{}' of '{}'",
+            "{} does not exist in version '{}' of '{:?}'",
             &ec.cmd_name,
             &ec.version,
             &ec.plugin.name
@@ -41,7 +41,12 @@ where
 {
     let func = |ec: ExecutableContext| {
         let command = ec.mk_command(args).ok_or_else(|| {
-            anyhow!("Command {} does not exist in {} version {}", ec.cmd_name, ec.plugin.name, ec.version)
+            anyhow!(
+                "Command {} does not exist in {:?} version {}",
+                ec.cmd_name,
+                ec.plugin.name,
+                ec.version
+            )
         })?;
         exec(command)
     };
@@ -77,9 +82,7 @@ where
             .find_tool(&cmd_name)?
             .ok_or_else(|| anyhow!("No tool configured for the command: {:?}", &cmd_name))?,
     };
-    let plugin = pm
-        .get_plugin(&tool.to_str().unwrap())
-        .with_context(|| format!("Getting plugin for {:?}", tool))?; // Fix: unwrap
+    let plugin = pm.get_plugin(&tool).with_context(|| format!("Getting plugin for {:?}", tool))?;
     let tvs = ToolVersions::new(&env.global_tool_versions_file, &env.current_dir, &tool.to_str().unwrap()); // fix: unwrap
     let version = tvs.get_version()?.ok_or_else(|| anyhow!("No version configured for {:?}", &tool))?;
     let ec = ExecutableContext::new(&cmd_name.to_str().unwrap(), plugin, &version, &env.installs_dir) // Fix: unwrap

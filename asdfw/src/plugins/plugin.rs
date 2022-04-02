@@ -1,4 +1,4 @@
-use std::{fs::File, path::PathBuf};
+use std::{ffi::OsStr, fs::File, path::PathBuf};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -8,7 +8,7 @@ pub const PLUGIN_FILENAME: &str = "plugin.yaml";
 
 #[derive(Debug)]
 pub struct Plugin<'a> {
-    pub name: &'a str,
+    pub name: &'a OsStr,
     pub dir: PathBuf,
     pub config: PluginConfig,
 }
@@ -44,12 +44,12 @@ impl PluginConfig {
 }
 
 impl<'a> Plugin<'a> {
-    pub fn new(name: &'a str, path: PathBuf) -> Result<Self> {
+    pub fn new(name: &'a OsStr, path: PathBuf) -> Result<Self> {
         let plugin_file = path.as_path().join(PLUGIN_FILENAME);
         let config = if plugin_file.exists() {
-            let f = File::open(plugin_file).with_context(|| format!("opening plugin config file for '{name}'"))?;
+            let f = File::open(plugin_file).with_context(|| format!("opening plugin config file for '{:?}'", name))?;
             let config: PluginConfig =
-                serde_yaml::from_reader(f).with_context(|| format!("Parsing plugin config for '{name}'"))?;
+                serde_yaml::from_reader(f).with_context(|| format!("Parsing plugin config for '{:?}'", name))?;
             if config.bin_dirs.is_empty() {
                 PluginConfig {
                     bin_dirs: PluginConfig::default_bin_dirs(),
@@ -81,7 +81,7 @@ mod test {
 
     #[test]
     fn plugin_new_with_config_should_return_parsed_config() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let yaml = "---\nbin_dirs:\n  - some/dir\n  - otherdir";
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
@@ -93,7 +93,7 @@ mod test {
 
     #[test]
     fn plugin_new_without_config_should_return_config_default_values() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let tmpdir = TempDir::new().unwrap();
         let plugin_dir = tmpdir.child(tool);
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
@@ -108,7 +108,7 @@ mod test {
 
     #[test]
     fn plugin_new_with_invalid_config_should_return_error() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let yaml = "-someinvaliddata";
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
@@ -120,7 +120,7 @@ mod test {
 
     #[test]
     fn plugin_should_return_provided_bin_directories() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let yaml = "---\nbin_dirs:\n  - some/dir\n  - otherdir";
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
@@ -132,7 +132,7 @@ mod test {
 
     #[test]
     fn plugin_should_return_default_bin_directories_if_no_config_file_exists() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let tmpdir = TempDir::new().unwrap();
         let plugin_dir = tmpdir.child(tool);
         let result = Plugin::new(tool, plugin_dir.to_path_buf()).unwrap();
@@ -144,7 +144,7 @@ mod test {
     #[case("---\nbin_dirs: []\n", "explicit empty bin dirs")]
     #[case("---\nsome_list: []\n", "absent bin dirs")]
     fn plugin_should_return_default_bin_directories_if_empty_in_config(#[case] yml: &str, #[case] msg: &str) {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let yaml = yml;
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
@@ -215,7 +215,7 @@ mod test {
         #[case] expected: Vec<EnvVar>,
         #[case] msg: &str,
     ) {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
         plugin_yaml.write_str(&yaml).unwrap();
@@ -227,7 +227,7 @@ mod test {
     #[case(Some("---\nbin_dirs: []\n"), "config without reference to env vars")]
     #[case(None, "no config file")]
     fn plugin_without_provided_environment_variables_returns_none(#[case] yml: Option<&str>, #[case] msg: &str) {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let plugin_dir = TempDir::new().unwrap();
         let plugin_yaml = plugin_dir.child(PLUGIN_FILENAME);
         if let Some(txt) = yml {

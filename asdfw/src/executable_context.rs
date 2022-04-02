@@ -104,7 +104,7 @@ mod tests {
         tool_dir: ChildPath,
     }
 
-    fn required_dirs(root: &TempDir, tool: &str) -> Paths {
+    fn required_dirs(root: &TempDir, tool: &OsStr) -> Paths {
         let plugin_dir = root.child(&tool);
         let installs_dir = root.child("installs");
         plugin_dir.create_dir_all().unwrap();
@@ -122,6 +122,7 @@ mod tests {
         version: &'a str,
         plugin_yml: Option<&str>,
     ) -> ExecutableContextFuxture<'a> {
+        let tool = OsStr::new(tool);
         let paths = required_dirs(root, tool);
         let tool_dir = paths.installs_dir.child(&tool).child(&version);
         if let Some(txt) = plugin_yml {
@@ -136,7 +137,7 @@ mod tests {
 
     #[test]
     fn new_computes_tool_install_root_correctly() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let version = "0.1";
         let tmpdir = TempDir::new().unwrap();
         let paths = required_dirs(&tmpdir, tool);
@@ -149,7 +150,7 @@ mod tests {
 
     #[test]
     fn new_returns_error_if_tool_directory_does_not_exist() {
-        let tool = "mytool";
+        let tool = OsStr::new("mytool");
         let version = "0.1";
         let tmpdir = TempDir::new().unwrap();
         let paths = required_dirs(&tmpdir, tool);
