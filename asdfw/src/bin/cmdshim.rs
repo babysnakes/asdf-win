@@ -1,7 +1,8 @@
-use anyhow::{Context, Result};
-use asdfw::common::{execute_command, Cmd};
+use anyhow::{anyhow, Context, Result};
+use asdfw::common::{execute_cmd_script, Cmd};
 use asdfw::runtime::RuntimeEnvironment;
 use flexi_logger::*;
+use std::ffi::OsStr;
 use std::{env, process};
 
 const ERROR_PREFIX: &str = "ASDFW ERROR";
@@ -16,20 +17,20 @@ fn main() -> Result<()> {
 }
 
 fn run() -> Result<i32> {
-    let me = env::current_exe()?;
-    let exe_name = me.file_name().unwrap();
-    let args = env::args().skip(1);
+    let mut args = env::args().skip(1);
+    let exe_name = args.next().ok_or_else(|| anyhow!("Command to run not supplied!"))?;
+    let tool = args.next().ok_or_else(|| anyhow!("Tool not supplied!"))?;
     let runtime = RuntimeEnvironment::new()?;
     if env::var(DEBUG_VARIABLE).is_ok() {
-        configure_log(&runtime)?;
+        configure_log(&runtime, &exe_name)?;
     };
 
-    execute_command(&runtime, &Cmd::UnResolved(exe_name), args)
+    execute_cmd_script(&runtime, &Cmd::Resolved(OsStr::new(&exe_name)), args, &tool)
 }
 
-fn configure_log(runtime: &RuntimeEnvironment) -> Result<LoggerHandle> {
+fn configure_log(runtime: &RuntimeEnvironment, basename: &str) -> Result<LoggerHandle> {
     Ok(Logger::try_with_str("debug")?
-        .log_to_file(FileSpec::default().directory(&runtime.log_dir))
+        .log_to_file(FileSpec::default().basename(basename).directory(&runtime.log_dir))
         .rotate(Criterion::Size(100_000), Naming::Numbers, Cleanup::KeepLogFiles(6))
         .append()
         .start()?)

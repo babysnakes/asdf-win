@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -7,9 +8,9 @@ use std::path::Path;
 
 use crate::plugins::plugin_manager::PluginManager;
 
-const EXTENSIONS: &[&str] = &["exe"];
+const LE: &str = "\r\n";
 
-pub type ShimsDB = HashMap<OsString, OsString>;
+pub type ShimsDB = HashMap<OsString, ShimData>;
 
 /// The Shims struct contains data required for handling shims.
 pub struct Shims<'a> {
@@ -18,6 +19,19 @@ pub struct Shims<'a> {
     shims_dir: &'a Path,
     shim_exe: &'a Path,
     plugin_manager: &'a PluginManager<'a>,
+    extensions: HashMap<&'static str, ShimType>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Copy, Clone)]
+pub enum ShimType {
+    ExeShim,
+    CmdShim,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct ShimData {
+    pub tool: OsString,
+    pub tipe: ShimType,
 }
 
 impl<'a> Shims<'a> {
@@ -42,6 +56,7 @@ impl<'a> Shims<'a> {
             shims_dir,
             shim_exe,
             plugin_manager,
+            extensions: HashMap::from([("exe", ShimType::ExeShim), ("cmd", ShimType::CmdShim)]),
         })
     }
 
@@ -66,7 +81,7 @@ impl<'a> Shims<'a> {
                 return Ok(Some(name));
             }
             let path = Path::new(exe);
-            for ext in EXTENSIONS.iter() {
+            for (ext, _) in self.extensions.iter() {
                 let with_ext = path.with_extension(ext);
                 if with_ext.as_os_str() == name {
                     return Ok(Some(name));
@@ -79,21 +94,30 @@ impl<'a> Shims<'a> {
     /// Find a plugin which owns this exe
     pub fn find_tool(&self, exe: &OsStr) -> Result<Option<OsString>> {
         let shims = self.load_db()?;
-        Ok(shims.get(exe).map(|s| s.to_owned()))
+        Ok(shims.get(exe).map(|s| s.tool.to_owned()))
     }
 
     /// Generates all required shims. Cleans up the shims directory before if desired.
     pub fn create_shims(&self, cleanup: bool) -> Result<()> {
+        // Fix: add support for CMD shims
         if cleanup {
             debug!("resetting shims directory");
             fs::remove_dir_all(self.shims_dir).context("cleaning up shims directory")?;
             fs::create_dir(self.shims_dir).context("recreating shims directory after cleanup")?;
         }
         let db = self.load_db()?;
-        for exe in db.keys() {
+        for (exe, data) in db {
             let target = self.shims_dir.join(&exe);
             debug!("Creating shim for {:?}", &exe);
-            fs::copy(&self.shim_exe, target).context(format!("creating shim for {:?}", &exe))?;
+            match data.tipe {
+                ShimType::ExeShim => {
+                    fs::copy(&self.shim_exe, target).context(format!("creating shim for {:?}", &exe))?;
+                }
+                ShimType::CmdShim => {
+                    let content = format!("@ECHO OFF{LE}cmdshim.exe {:?} {:?} %*", &exe, &data.tool);
+                    fs::write(&target, &content)?;
+                }
+            }
         }
         Ok(())
     }
@@ -116,16 +140,20 @@ impl<'a> Shims<'a> {
                         path.push(bin_dir);
                         for exe in fs::read_dir(path)? {
                             let exe = exe?;
-                            if valid_exe_extension(exe.path().extension()) {
+                            if let Some(tipe) = self.requires_shim(exe.path().extension()) {
                                 let exe_name = exe.file_name();
-                                let old_value = db.insert(exe_name.clone(), tool.clone());
+                                let shim_data = ShimData {
+                                    tool: tool.clone(),
+                                    tipe,
+                                };
+                                let old_value = db.insert(exe_name.clone(), shim_data);
                                 if let Some(value) = old_value {
-                                    if value != tool {
+                                    if value.tool != tool {
                                         return Err(anyhow!(
                                             "{:?} appears in two tools: {:?} and {:?}",
                                             &exe_name,
                                             &tool,
-                                            &value
+                                            &value.tool
                                         ));
                                     }
                                 }
@@ -138,15 +166,15 @@ impl<'a> Shims<'a> {
 
         Ok(db)
     }
-}
 
-fn valid_exe_extension(extension: Option<&OsStr>) -> bool {
-    for item in EXTENSIONS.iter() {
-        if Some(OsStr::new(item)) == extension {
-            return true;
+    fn requires_shim(&self, extension: Option<&OsStr>) -> Option<ShimType> {
+        for (item, tipe) in &self.extensions {
+            if Some(OsStr::new(item)) == extension {
+                return Some(*tipe);
+            }
         }
+        None
     }
-    false
 }
 
 #[cfg(test)]
@@ -184,13 +212,20 @@ mod tests {
         }
     }
 
+    fn mk_exe_shim_data(tool: &str) -> ShimData {
+        ShimData {
+            tool: OsString::from(tool),
+            tipe: ShimType::ExeShim,
+        }
+    }
+
     fn test_data() -> ShimsDB {
         HashMap::from([
-            (OsString::from("kubectl.exe"), OsString::from("kubectl")),
-            (OsString::from("docker.exe"), OsString::from("docker")),
-            (OsString::from("minikube.exe"), OsString::from("minikube")),
-            (OsString::from("kubectx.exe"), OsString::from("kubectx")),
-            (OsString::from("kubens.exe"), OsString::from("kubectx")),
+            (OsString::from("kubectl.exe"), mk_exe_shim_data("kubectl")),
+            (OsString::from("docker.exe"), mk_exe_shim_data("docker")),
+            (OsString::from("minikube.exe"), mk_exe_shim_data("minikube")),
+            (OsString::from("kubectx.exe"), mk_exe_shim_data("kubectx")),
+            (OsString::from("kubens.exe"), mk_exe_shim_data("kubectx")),
         ])
     }
 
@@ -300,8 +335,11 @@ mod tests {
         paths.tools_install_dir.child("kubectx").child("0.12").child("bin").create_dir_all().unwrap();
         paths.tools_install_dir.child("kubectx").child("0.12").child("bin").child("kubectx.exe").touch().unwrap();
         paths.tools_install_dir.child("kubectx").child("0.12").child("bin").child("kubens.exe").touch().unwrap();
+        paths.tools_install_dir.child("nodejs").child("1.12").child("bin").create_dir_all().unwrap();
+        paths.tools_install_dir.child("nodejs").child("1.12").child("bin").child("npm.cmd").touch().unwrap();
+        let mut db = test_data();
+        db.insert(OsString::from("npm.cmd"), ShimData { tool: OsString::from("nodejs"), tipe: ShimType::CmdShim });
 
-        let db = test_data();
         let generated = shims.generate_db_from_installed_tools().unwrap();
         assert_eq!(db, generated);
     }
@@ -357,6 +395,26 @@ mod tests {
             assert!(shims.shims_dir.join(k).exists(), "shim '{:?}' does not exist", &k);
         });
         assert_eq!(shims.shims_dir.read_dir().unwrap().count(), 5);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn create_shims_should_produce_correct_cmd_script_shims() {
+        let mut db = test_data();
+        db.insert(OsString::from("npm.cmd"), ShimData { tool: OsString::from("nodejs"), tipe: ShimType::CmdShim });
+        let tmp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&tmp_dir);
+        let pm = PluginManager::new(&paths.plugins_dir);
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
+        shims.save_db(&db).unwrap();
+        shims.create_shims(false).unwrap();
+        assert_eq!(shims.shims_dir.read_dir().unwrap().count(), 6);
+        let cmdshim = shims.shims_dir.join("npm.cmd");
+        let content = fs::read_to_string(&cmdshim).unwrap();
+        dbg!(&content);
+        assert!(content.contains("cmdshim.exe"), "cmd shim should contain call to cmdshim.exe");
+        assert!(content.contains("npm.cmd"), "cmd shim should contain running script");
+        assert!(content.contains("nodejs"), "cmd shim should contain tool");
     }
 
     #[test]

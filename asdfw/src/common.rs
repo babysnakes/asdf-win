@@ -34,7 +34,7 @@ where
     S: AsRef<OsStr>,
 {
     let func = |ec: ExecutableContext| {
-        let command = ec.mk_command(args).ok_or_else(|| {
+        let command = ec.mk_command(args, false).ok_or_else(|| {
             anyhow!(
                 "Command {:?} does not exist in {:?} version {}",
                 ec.cmd_name,
@@ -44,7 +44,29 @@ where
         })?;
         exec(command)
     };
+
     run_with_executable_context(env, cmd, None, func)
+}
+
+pub fn execute_cmd_script<I, S>(env: &RuntimeEnvironment, cmd: &Cmd, args: I, tool: &str) -> Result<i32>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let func = |ec: ExecutableContext| {
+        let command = ec.mk_command(args, true).ok_or_else(|| {
+            anyhow!(
+                "Command {:?} does not exist in {:?} version {}",
+                ec.cmd_name,
+                ec.plugin.name,
+                ec.version.to_string_lossy()
+            )
+        })?;
+        exec(command)
+    };
+    let tool = OsStr::new(tool);
+
+    run_with_executable_context(env, cmd, Some(tool), func)
 }
 
 pub fn run_with_executable_context<F, T>(

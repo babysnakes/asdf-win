@@ -48,15 +48,23 @@ impl<'a> ExecutableContext<'a> {
     }
 
     /// Creates a `process::Command` from self (plus the provided args). Returns
-    /// `None` if `self.cmd_name` does not point to any existing command.
-    pub fn mk_command<I, S>(&self, args: I) -> Option<Command>
+    /// `None` if `self.cmd_name` does not point to any existing command. The
+    /// `cmd_exe` flag indicates whether this command should be executed as
+    /// parameter to `cmd.exe \C`.
+    pub fn mk_command<I, S>(&self, args: I, use_cmd_exe: bool) -> Option<Command>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
         let envs = self.env_vars_to_envs(&self.plugin.config.env_vars);
         let cmd = self.get_full_executable_path()?;
-        let mut command = Command::new(&cmd);
+        let mut command = if use_cmd_exe {
+            let mut command = Command::new("cmd.exe");
+            command.arg(r"\C").arg(&cmd);
+            command
+        } else {
+            Command::new(&cmd)
+        };
         command.args(args).envs(envs);
         Some(command)
     }
@@ -248,7 +256,7 @@ mod tests {
         let exe = bindir.child(&cmd);
         exe.touch().unwrap();
         let args: Vec<&str> = vec![];
-        let command = fixture.ec.mk_command(args).unwrap();
+        let command = fixture.ec.mk_command(args, false).unwrap();
         assert_eq!(command.get_program(), exe.as_os_str());
     }
 
@@ -260,7 +268,10 @@ mod tests {
         let tmpdir = TempDir::new().unwrap();
         let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
         let args: Vec<&str> = vec![];
-        assert!(fixture.ec.mk_command(args).is_none(), "should return none on missing executable");
+        assert!(
+            fixture.ec.mk_command(args, false).is_none(),
+            "should return none on missing executable"
+        );
     }
 
     #[test]
@@ -275,7 +286,7 @@ mod tests {
         let exe = bindir.child(&cmd);
         exe.touch().unwrap();
         let args: Vec<&str> = vec!["-f", "some"];
-        let command = fixture.ec.mk_command(&args).unwrap();
+        let command = fixture.ec.mk_command(&args, false).unwrap();
         let mut result = command.get_args();
         assert_eq!(result.next().unwrap(), args[0]);
         assert_eq!(result.next().unwrap(), args[1]);
@@ -293,7 +304,7 @@ mod tests {
         let exe = bindir.child(&cmd);
         exe.touch().unwrap();
         let args: Vec<&str> = vec![];
-        let command = fixture.ec.mk_command(&args).unwrap();
+        let command = fixture.ec.mk_command(&args, false).unwrap();
         let mut result = command.get_args();
         assert!(result.next().is_none(), "expected empty args, got {:?}", result);
     }
@@ -317,11 +328,32 @@ mod tests {
         let exe = bindir.child(&cmd);
         exe.touch().unwrap();
         let args: Vec<&str> = vec![];
-        let command = fixture.ec.mk_command(&args).unwrap();
+        let command = fixture.ec.mk_command(&args, false).unwrap();
         let mut envs = command.get_envs();
         let expected = (OsStr::new("MYENV"), Some(OsStr::new("A Value")));
         let first_env = envs.next().unwrap();
         assert_eq!(first_env, expected);
+    }
+
+    #[test]
+    fn mk_command_with_use_cmd_exe_behaves_correctly() {
+        let tool = "mytool";
+        let version = "0.1";
+        let cmd = "script.cmd";
+        let tmpdir = TempDir::new().unwrap();
+        let fixture = fixture_executable_context(&tmpdir, cmd, tool, version, None);
+        let bindir = fixture.tool_dir.child("bin");
+        bindir.create_dir_all().unwrap();
+        let exe = bindir.child(&cmd);
+        exe.touch().unwrap();
+        let args: Vec<&str> = vec!["-f", "some"];
+        let command = fixture.ec.mk_command(&args, true).unwrap();
+        assert_eq!(command.get_program(), OsStr::new("cmd.exe"));
+        let mut result = command.get_args();
+        assert_eq!(result.next().unwrap(), r"\C");
+        assert_eq!(result.next().unwrap(), exe.as_os_str());
+        assert_eq!(result.next().unwrap(), args[0]);
+        assert_eq!(result.next().unwrap(), args[1]);
     }
 
     #[test]
