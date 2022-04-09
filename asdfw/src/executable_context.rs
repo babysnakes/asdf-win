@@ -60,7 +60,7 @@ impl<'a> ExecutableContext<'a> {
         let cmd = self.get_full_executable_path()?;
         let mut command = if use_cmd_exe {
             let mut command = Command::new("cmd.exe");
-            command.arg(r"\C").arg(&cmd);
+            command.arg("/C").arg(&cmd);
             command
         } else {
             Command::new(&cmd)
