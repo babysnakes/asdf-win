@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
-use std::path::PathBuf;
+use std::{path::PathBuf, env};
+
+const CUSTOM_APP_DIR_ENV: &str = "ASDFW_CUSTOM_APPDIR";
 
 #[derive(Debug)]
 pub struct RuntimeEnvironment {
@@ -18,7 +20,10 @@ impl RuntimeEnvironment {
     pub fn new() -> Result<Self> {
         let home_dir = dirs::home_dir().ok_or(anyhow!("Could not get home directory"))?;
         let current_dir = std::env::current_dir()?;
-        let app_dir = home_dir.join(".asdfw");
+        let app_dir = match env::var(CUSTOM_APP_DIR_ENV) {
+            Ok(dir) => PathBuf::from(dir),
+            Err(_) => home_dir.join(".asdfw"),
+        };
         let shims_db = app_dir.join("shims.db");
         let installs_dir = app_dir.join("installs");
         let shims_dir = app_dir.join("shims");

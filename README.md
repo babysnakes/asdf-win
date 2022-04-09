@@ -10,6 +10,14 @@ way :slightly_smiling_face:). You can manually place standalone binaries in a
 specific path (see [usage](#usage) below), generate shims and configure global,
 local and custom version using tools.
 
+## Dev Environment
+
+It's possible to work on a different copy of _asdf-win_ for development purposes
+(e.g. for testing breaking changes). One could define the `ASDFW_CUSTOM_APPDIR`
+environment variable pointing to an alternative installation of asdfw. Note that
+none of the _powershell_ helpers work with this override. You'll have to
+manually install the executables.
+
 ## Installation (Windows only)
 
 Once the archive is downloaded and extracted, cd into the directory using
