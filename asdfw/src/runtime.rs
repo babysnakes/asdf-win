@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use std::{path::PathBuf, env};
+use std::{env, path::PathBuf};
 
 const CUSTOM_APP_DIR_ENV: &str = "ASDFW_CUSTOM_APPDIR";
 

@@ -5,10 +5,9 @@ use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::Path;
+use stripmargin::StripMargin;
 
 use crate::plugins::plugin_manager::PluginManager;
-
-const LE: &str = "\r\n";
 
 pub type ShimsDB = HashMap<OsString, ShimData>;
 
@@ -114,7 +113,24 @@ impl<'a> Shims<'a> {
                     fs::copy(&self.shim_exe, target).context(format!("creating shim for {:?}", &exe))?;
                 }
                 ShimType::CmdShim => {
-                    let content = format!("@ECHO OFF{LE}cmdshim.exe {:?} {:?} %*", &exe, &data.tool);
+                    let content = format!(
+                        r#"@ECHO OFF
+                          |                          
+                          |SETLOCAL
+                          |
+                          |FOR /F "delims=" %%F IN ('CALL cmdshim.exe {:?} {:?}') DO (
+                          |    SET commandToRun=%%F
+                          |)
+                          |
+                          |if "%commandToRun%" == "" (
+                          |    exit 1
+                          |)
+                          |
+                          |"%commandToRun%" %*
+                          |"#,
+                        &exe, &data.tool,
+                    )
+                    .strip_margin();
                     fs::write(&target, &content)?;
                 }
             }

@@ -144,3 +144,22 @@ fn which_with_specific_command_missing_should_return_matching_error() {
     );
     assert!(msg.contains(version), "Expected error to reference configured version, got: '{msg}'");
 }
+
+#[test]
+fn which_with_specific_tool_does_not_check_for_tool_existance() {
+    // these are details of a tool that is not installed
+    let tool = "nosuchtool";
+    let version = "1.23.4";
+    let cmd = "nocmd.exe";
+    let versions = format!("{} {}", &tool, &version);
+    let tmp_dir = TempDir::new().unwrap();
+    let paths = Paths::new(&tmp_dir, &versions, None);
+    let env = paths.to_environment();
+    common::fixture_installed_tools(&paths.installs_dir);
+    let db = paths.generate_shims_db();
+    common::test_data_matching_shims(&paths.shims_dir, &db);
+    let error = find_path_for_cmd_with_tool(&env, cmd, tool).unwrap_err();
+    let message = format!("{}", error);
+    assert!(message.contains("Could not find shim"), "error should complain about finding shim");
+    assert!(message.contains(cmd), "error should specify the command");
+}

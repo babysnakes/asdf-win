@@ -28,13 +28,28 @@ pub fn find_path_for_cmd(env: &RuntimeEnvironment, cmd: &str) -> Result<OsString
     run_with_executable_context(env, &Cmd::UnResolved(OsStr::new(cmd)), None, func)
 }
 
+pub fn find_path_for_cmd_with_tool(env: &RuntimeEnvironment, cmd: &str, tool: &str) -> Result<OsString> {
+    let func = |ec: ExecutableContext| match ec.get_full_executable_path() {
+        Some(path) => Ok(path.into_os_string()),
+        None => Err(anyhow!(
+            "{:?} does not exist in version '{}' of '{:?}'",
+            &ec.cmd_name,
+            &ec.version.to_string_lossy(),
+            &ec.plugin.name
+        )),
+    };
+    let tool = OsStr::new(tool);
+
+    run_with_executable_context(env, &Cmd::UnResolved(OsStr::new(cmd)), Some(tool), func)
+}
+
 pub fn execute_command<I, S>(env: &RuntimeEnvironment, cmd: &Cmd, args: I) -> Result<i32>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let func = |ec: ExecutableContext| {
-        let command = ec.mk_command(args, false).ok_or_else(|| {
+        let command = ec.mk_command(args).ok_or_else(|| {
             anyhow!(
                 "Command {:?} does not exist in {:?} version {}",
                 ec.cmd_name,
@@ -46,27 +61,6 @@ where
     };
 
     run_with_executable_context(env, cmd, None, func)
-}
-
-pub fn execute_cmd_script<I, S>(env: &RuntimeEnvironment, cmd: &Cmd, args: I, tool: &str) -> Result<i32>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let func = |ec: ExecutableContext| {
-        let command = ec.mk_command(args, true).ok_or_else(|| {
-            anyhow!(
-                "Command {:?} does not exist in {:?} version {}",
-                ec.cmd_name,
-                ec.plugin.name,
-                ec.version.to_string_lossy()
-            )
-        })?;
-        exec(command)
-    };
-    let tool = OsStr::new(tool);
-
-    run_with_executable_context(env, cmd, Some(tool), func)
 }
 
 pub fn run_with_executable_context<F, T>(
