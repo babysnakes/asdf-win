@@ -45,12 +45,12 @@ function installBinaries {
     $binDir = Join-Path $ASDFWDir "bin"
     $libDir = Join-Path $ASDFWDir "lib"
     $asdfwFile = Join-Path $PSScriptRoot "asdfw.exe"
-    $cmdshimFile = Join-Path $PSScriptRoot "cmdshim.exe"
+    $asdfswhichFile = Join-Path $PSScriptRoot "asdfwhich.exe"
     $shimFile = Join-Path $PSScriptRoot "shim.exe"
     Write-Debug "copying .\asdfw.exe $binDir"
     Copy-Item $asdfwFile $binDir
-    Write-Debug "copying .\cmdshim.exe $binDir"
-    Copy-Item $cmdshimFile $binDir
+    Write-Debug "copying .\asdfwhich.exe $binDir"
+    Copy-Item $asdfswhichFile $binDir
     Write-Debug "copying .\shim.exe $libDir"
     Copy-Item $shimFile $libDir
 }

@@ -118,7 +118,7 @@ impl<'a> Shims<'a> {
                           |                          
                           |SETLOCAL
                           |
-                          |FOR /F "delims=" %%F IN ('CALL cmdshim.exe {:?} {:?}') DO (
+                          |FOR /F "delims=" %%F IN ('CALL asdfwhich.exe {:?} {:?}') DO (
                           |    SET commandToRun=%%F
                           |)
                           |
@@ -428,7 +428,7 @@ mod tests {
         let cmdshim = shims.shims_dir.join("npm.cmd");
         let content = fs::read_to_string(&cmdshim).unwrap();
         dbg!(&content);
-        assert!(content.contains("cmdshim.exe"), "cmd shim should contain call to cmdshim.exe");
+        assert!(content.contains("asdfwhich.exe"), "cmd shim should contain call to asdfwhich.exe");
         assert!(content.contains("npm.cmd"), "cmd shim should contain running script");
         assert!(content.contains("nodejs"), "cmd shim should contain tool");
     }
