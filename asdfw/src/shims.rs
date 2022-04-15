@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use log::{debug, info};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
@@ -175,26 +175,30 @@ impl<'a> Shims<'a> {
                     for bin_dir in &plugin.config.bin_dirs {
                         let mut path = version.path();
                         path.push(bin_dir);
-                        for exe in fs::read_dir(path)? {
-                            let exe = exe?;
-                            if let Some(tipe) = self.requires_shim(exe.path().extension()) {
-                                let exe_name = exe.file_name();
-                                let shim_data = ShimData {
-                                    tool: tool.clone(),
-                                    tipe,
-                                };
-                                let old_value = db.insert(exe_name.clone(), shim_data);
-                                if let Some(value) = old_value {
-                                    if value.tool != tool {
-                                        return Err(anyhow!(
-                                            "{:?} appears in two tools: {:?} and {:?}",
-                                            &exe_name,
-                                            &tool,
-                                            &value.tool
-                                        ));
+                        if path.exists() {
+                            for exe in fs::read_dir(path)? {
+                                let exe = exe?;
+                                if let Some(tipe) = self.requires_shim(exe.path().extension()) {
+                                    let exe_name = exe.file_name();
+                                    let shim_data = ShimData {
+                                        tool: tool.clone(),
+                                        tipe,
+                                    };
+                                    let old_value = db.insert(exe_name.clone(), shim_data);
+                                    if let Some(value) = old_value {
+                                        if value.tool != tool {
+                                            return Err(anyhow!(
+                                                "{:?} appears in two tools: {:?} and {:?}",
+                                                &exe_name,
+                                                &tool,
+                                                &value.tool
+                                            ));
+                                        }
                                     }
                                 }
                             }
+                        } else {
+                            warn!("Bin dir {:?} does not exist", &path)
                         }
                     }
                 }
@@ -397,6 +401,20 @@ mod tests {
         paths.tools_install_dir.child("kubectl").child("1.1").child("bin").child("kubectl.txt").touch().unwrap();
         let generated = shims.generate_db_from_installed_tools().unwrap();
         assert!(!generated.contains_key(OsStr::new("kubectl.txt")), "should not contain files with wrong extension");
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn generate_db_when_bin_directory_missing_from_file_system_shold_not_fail() {
+        let tmp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&tmp_dir);
+        let pm = PluginManager::new(&paths.plugins_dir);
+        let shims = Shims::new(&paths.db_path, &paths.tools_install_dir, &paths.shims_dir, &paths.shim_exe, &pm).unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").create_dir_all().unwrap();
+        paths.tools_install_dir.child("kubectl").child("1.2.4").child("bin").child("kubectl.exe").touch().unwrap();
+        paths.tools_install_dir.child("mytool").child("1.2.4").create_dir_all().unwrap();
+        let generated = shims.generate_db_from_installed_tools();
+        assert!(generated.is_ok(), "missing bin dir should not result in error but got: {:?}", &generated);
     }
 
     #[test]
