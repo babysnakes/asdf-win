@@ -492,7 +492,7 @@ mod tests {
         assert!(content.contains("asdfwhich.exe"), "posh shim should contain call to asdfwhich.exe");
         assert!(content.contains("npm.ps1"), "posh shim should contain running script");
         assert!(content.contains("nodejs"), "posh shim should contain tool");
-        assert!(content.contains("& $exePath $Args"), "posh shim should contain call to executable");
+        assert!(content.contains(r#"& "$exePath" @Args"#), "posh shim should contain call to executable");
     }
 
     #[test]
